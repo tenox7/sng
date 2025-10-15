@@ -6,6 +6,7 @@
 ## Features
 
 - vertical scale fine controls, auto, margin, max, hardmax
+- vertical bar with latest value
 - logarithmic ringbuf
 - save ringbuf to file
 

@@ -5,8 +5,13 @@
 
 ## Features
 
+- Makefile is a mess restructurj
+- perhaps make makefiles per platform eg Makefile.aix, etc include frommain
+- allow buildingin without net-snmp / remove source
+
 - vertical scale fine controls, auto, margin, max, hardmax
 - vertical bar with latest value
+- horizontal guides ie softmax or ncpu for load
 - logarithmic ringbuf
 - save ringbuf to file
 
@@ -16,7 +21,8 @@
 - modern stats like temperature, wifi signal, battery level
 - snmp v2 getifx
 - interface errors, drops, etc local and snmp
-- own snmp client implementation without net-snmp
+- storage MB/s from iostat
+- own snmp client implementation without net-snmp, maybe use uSNMP library
 - IPv6 ping
 
 

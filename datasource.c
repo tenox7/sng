@@ -7,7 +7,6 @@
 extern datasource_handler_t ping_handler;
 extern datasource_handler_t cpu_handler;
 extern datasource_handler_t memory_handler;
-extern datasource_handler_t snmp_handler;
 extern datasource_handler_t if_thr_handler;
 extern datasource_handler_t loadavg_handler;
 extern datasource_handler_t shell_handler;
@@ -17,7 +16,6 @@ static datasource_handler_t *handlers[] = {
     &ping_handler,
     &cpu_handler,
     &memory_handler,
-    &snmp_handler,
     &if_thr_handler,
     &loadavg_handler,
     &shell_handler,

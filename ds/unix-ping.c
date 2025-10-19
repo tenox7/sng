@@ -1,4 +1,5 @@
 
+#include "../compat.h"
 #include "sryze-ping.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,15 +9,15 @@
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#if defined(__hpux) || defined(UNIXWARE)
+#if defined(__hpux) || defined(UNIXWARE) || defined(__osf__) || defined(__digital__)
 #include <netinet/in_systm.h>
 #endif
 #include <netinet/ip.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#ifdef _AIX
-typedef size_t socklen_t;
+#if defined(_AIX) || defined(__osf__) || defined(__digital__)
+typedef int socklen_t;
 #endif
 
 struct icmp {
@@ -197,7 +198,11 @@ int sryze_ping_send(sryze_ping_context_t *ctx_ptr, double *ping_time_ms)
         }
 
         ip = (struct ip *)packet;
+#if defined(__osf__) || defined(__digital__)
+        hlen = (*(u_char *)packet & 0x0f) << 2;
+#else
         hlen = ip->ip_hl << 2;
+#endif
         if (cc < hlen + ICMP_MINLEN) {
             continue;
         }

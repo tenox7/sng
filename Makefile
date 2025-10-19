@@ -43,6 +43,10 @@ ifeq ($(UNAME_S),UnixWare)
     CFLAGS += -I/usr/local/include -DUNIXWARE
     LDFLAGS += -L/usr/local/lib -lthread -lm -lsocket -lnsl -lelf /usr/local/lib/libnetsnmp.a
 endif
+ifeq ($(UNAME_S),OSF1)
+    CFLAGS += -I/usr/local/include -pthread
+    LDFLAGS += -L/usr/local/lib -pthread -lm -lmach -lnetsnmp
+endif
 
 # Graphics driver selection
 ifeq ($(GFX),SDL3)
@@ -87,7 +91,11 @@ else
             ifeq ($(UNAME_S),UnixWare)
                 PING_SRC = ds/unix-ping.c
             else
-                PING_SRC = ds/sryze-ping.c
+                ifeq ($(UNAME_S),OSF1)
+                    PING_SRC = ds/unix-ping.c
+                else
+                    PING_SRC = ds/sryze-ping.c
+                endif
             endif
         endif
     endif

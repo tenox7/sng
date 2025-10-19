@@ -302,7 +302,10 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
 }
 
 void os_sleep(uint32_t milliseconds) {
-    usleep(milliseconds * 1000);
+    struct timeval tv;
+    tv.tv_sec = milliseconds / 1000;
+    tv.tv_usec = (milliseconds % 1000) * 1000;
+    select(0, NULL, NULL, NULL, &tv);
 }
 
 uint32_t os_get_time_ms(void) {

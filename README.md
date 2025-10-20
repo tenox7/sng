@@ -11,13 +11,15 @@ Supports multiple graphs with:
 
 ## Supported OS
 
-- darwin/osx/macOS
-- Linux
+- macOS/osx
 - FreeBSD
+- Linux
 - Solaris/Illumos/OI
 - HP-UX
 - AIX
 - UnixWare
+- IRIX
+- Tru64
 
 ## Supported Graphics/UI backends
 
@@ -28,7 +30,7 @@ Supports multiple graphs with:
 
 ## Elevated permissions
 
-ICMP Echo requires elevated (root) privileges. To get ping working you will need to run SNG either with:
+ICMP Echo/Ping requires elevated (root) privileges. To get ping working you will need to run SNG either with:
 
 Sudo:
 

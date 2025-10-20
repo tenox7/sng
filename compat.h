@@ -1,6 +1,13 @@
 #ifndef COMPAT_H
 #define COMPAT_H
 
+/* Platform-specific feature test macros must come first */
+#if defined(sgi) || defined(__sgi)
+#define _SGI_SOURCE 1
+#define _SGI_MP_SOURCE 1
+#define _SGI_REENTRANT_FUNCTIONS 1
+#endif
+
 /* C89 compatibility definitions */
 
 /* Include system headers first to get their definitions */

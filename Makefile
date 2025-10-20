@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -g
-LDFLAGS = 
+LDFLAGS =
 
 # Platform detection
 UNAME_S ?= $(shell uname -s)
@@ -46,6 +46,10 @@ endif
 ifeq ($(UNAME_S),OSF1)
     CFLAGS += -I/usr/local/include -pthread
     LDFLAGS += -L/usr/local/lib -pthread -lm -lmach -lnetsnmp
+endif
+ifneq ($(findstring IRIX,$(UNAME_S)),)
+    CFLAGS += -isystem /usr/include -I/usr/local/include -D__STDINT_H__
+    LDFLAGS += -L/usr/local/lib -lpthread -lm -lnetsnmp -lelf
 endif
 
 # Graphics driver selection
@@ -94,7 +98,11 @@ else
                 ifeq ($(UNAME_S),OSF1)
                     PING_SRC = ds/unix-ping.c
                 else
-                    PING_SRC = ds/sryze-ping.c
+                    ifneq ($(findstring IRIX,$(UNAME_S)),)
+                        PING_SRC = ds/unix-ping.c
+                    else
+                        PING_SRC = ds/sryze-ping.c
+                    endif
                 endif
             endif
         endif

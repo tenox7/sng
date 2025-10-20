@@ -17,6 +17,7 @@ struct plot_thread_t {
 #include <fcntl.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 #include <sys/time.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -227,7 +228,11 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
 }
 
 void os_sleep(uint32_t milliseconds) {
-    usleep(milliseconds * 1000);
+    struct timespec ts;
+
+    ts.tv_sec = milliseconds / 1000;
+    ts.tv_nsec = (milliseconds % 1000) * 1000000;
+    nanosleep(&ts, NULL);
 }
 
 uint32_t os_get_time_ms(void) {

@@ -187,7 +187,7 @@ SNG is inspired by:
 
 - [SunOS Performance Meter](https://web.archive.org/web/20121207213342/https://docs.oracle.com/cd/E19683-01/806-4743/perfmeterusing-64/index.html)
 - DEC Unix / Tru64 cpuinfo
-- [xosview](https://xosview.sourceforge.net/)
+- [xosview](https://xosview.sourceforge.net/) and originally IRIX gr_osview
 - Plan 9 stats, gping 
 - [STG](http://leonidvm.chat.ru/)
 - [SRG](https://sourceforge.net/projects/snmprg/)

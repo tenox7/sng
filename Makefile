@@ -8,10 +8,12 @@ ifeq ($(UNAME_S),Darwin)
     CFLAGS += -I/opt/homebrew/include -I/opt/homebrew/opt/net-snmp/include -I/opt/homebrew/opt/openssl/include
     LDFLAGS += -L/opt/homebrew/lib -L/opt/homebrew/opt/net-snmp/lib -L/opt/homebrew/opt/openssl/lib
     LDFLAGS += -framework CoreFoundation -framework IOKit -lnetsnmp
+    PING_SRC = ds/sryze-ping.c
 endif
 ifeq ($(UNAME_S),Linux)
     CFLAGS += -DLINUX
     LDFLAGS += -lpthread -lm
+    PING_SRC = ds/sryze-ping.c
     # Try to add Net-SNMP support if available
     ifneq ($(shell which net-snmp-config),)
         CFLAGS += $(shell net-snmp-config --cflags 2>/dev/null)
@@ -20,36 +22,45 @@ ifeq ($(UNAME_S),Linux)
 endif
 ifeq ($(UNAME_S),FreeBSD)
     LDFLAGS += -lpthread -lm -lnetsnmp
+    PING_SRC = ds/sryze-ping.c
 endif
 ifeq ($(UNAME_S),NetBSD)
     LDFLAGS += -lpthread -lm -lnetsnmp
+    PING_SRC = ds/sryze-ping.c
 endif
 ifeq ($(UNAME_S),OpenBSD)
     LDFLAGS += -lpthread -lm -lnetsnmp
+    PING_SRC = ds/sryze-ping.c
 endif
 ifeq ($(UNAME_S),SunOS)
     CFLAGS += -I/usr/local/include
     LDFLAGS += -L/usr/local/lib -lpthread -lm -lsocket -lnsl -lrt -lkstat -lnetsnmp
+    PING_SRC = ds/unix-ping.c
 endif
 ifeq ($(UNAME_S),HP-UX)
     CFLAGS += -I/usr/local/include
     LDFLAGS += -L/usr/local/lib -lpthread -lm -lnm -lnetsnmp
+    PING_SRC = ds/unix-ping.c
 endif
 ifeq ($(UNAME_S),AIX)
     CFLAGS += -I/usr/local/include -pthread
     LDFLAGS += -L/usr/local/lib -pthread -lm -lnetsnmp
+    PING_SRC = ds/unix-ping.c
 endif
 ifeq ($(UNAME_S),UnixWare)
     CFLAGS += -I/usr/local/include -DUNIXWARE
     LDFLAGS += -L/usr/local/lib -lthread -lm -lsocket -lnsl -lelf /usr/local/lib/libnetsnmp.a
+    PING_SRC = ds/unix-ping.c
 endif
 ifeq ($(UNAME_S),OSF1)
     CFLAGS += -I/usr/local/include -pthread
     LDFLAGS += -L/usr/local/lib -pthread -lm -lmach -lnetsnmp
+    PING_SRC = ds/unix-ping.c
 endif
 ifneq ($(findstring IRIX,$(UNAME_S)),)
     CFLAGS += -isystem /usr/include -I/usr/local/include -D__STDINT_H__
     LDFLAGS += -L/usr/local/lib -lpthread -lm -lnetsnmp -lelf
+    PING_SRC = ds/unix-ping.c
 endif
 
 # Graphics driver selection
@@ -81,32 +92,6 @@ endif
 ifeq ($(GFX),)
     CFLAGS += -DGFX_X11
     LDFLAGS += -lX11
-endif
-
-ifeq ($(UNAME_S),SunOS)
-    PING_SRC = ds/unix-ping.c
-else
-    ifeq ($(UNAME_S),HP-UX)
-        PING_SRC = ds/unix-ping.c
-    else
-        ifeq ($(UNAME_S),AIX)
-            PING_SRC = ds/unix-ping.c
-        else
-            ifeq ($(UNAME_S),UnixWare)
-                PING_SRC = ds/unix-ping.c
-            else
-                ifeq ($(UNAME_S),OSF1)
-                    PING_SRC = ds/unix-ping.c
-                else
-                    ifneq ($(findstring IRIX,$(UNAME_S)),)
-                        PING_SRC = ds/unix-ping.c
-                    else
-                        PING_SRC = ds/sryze-ping.c
-                    endif
-                endif
-            endif
-        endif
-    endif
 endif
 
 SOURCES = main.c graphics.c config.c plot.c ringbuf.c threading.c ini_parser.c datasource.c ds/ping.c $(PING_SRC) ds/cpu.c ds/memory.c ds/snmp.c ds/if_thr.c ds/loadavg.c ds/shell.c ds/clock.c os/os.c

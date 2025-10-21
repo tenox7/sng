@@ -1,3 +1,5 @@
+/* https://github.com/sryze/ping */
+
 #ifndef _GNU_SOURCE
     #define _GNU_SOURCE
 #endif

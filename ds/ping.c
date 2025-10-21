@@ -1,6 +1,5 @@
-
 #include "../datasource.h"
-#include "sryze-ping.h"
+#include "../os/os_interface.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -8,7 +7,7 @@
 #include "../compat.h"
 
 typedef struct {
-    sryze_ping_context_t *sryze_ctx;
+    os_ping_context_t *ping_ctx;
     char *target;
     time_t last_dns_retry;
     int dns_failed;
@@ -33,7 +32,7 @@ static int ping_init(const char *target, void **context) {
         return 0;
     }
     strcpy(ctx->target, target);
-    ctx->sryze_ctx = NULL;
+    ctx->ping_ctx = NULL;
     ctx->last_dns_retry = 0;
     ctx->dns_failed = 0;
     ctx->min = 10000.0;
@@ -42,8 +41,8 @@ static int ping_init(const char *target, void **context) {
     ctx->sample_count = 0;
     ctx->last = 0.0;
 
-    ctx->sryze_ctx = sryze_ping_create(target, 1000);
-    if (!ctx->sryze_ctx) {
+    ctx->ping_ctx = os_ping_create(target, 1000);
+    if (!ctx->ping_ctx) {
         ctx->dns_failed = 1;
         ctx->last_dns_retry = time(NULL);
     }
@@ -61,31 +60,31 @@ static int ping_collect(void *context, double *value) {
     ctx = (ping_context_t *)context;
     if (!ctx || !value) return 0;
 
-    if (ctx->dns_failed || !ctx->sryze_ctx) {
+    if (ctx->dns_failed || !ctx->ping_ctx) {
         now = time(NULL);
         if (now - ctx->last_dns_retry >= 30) {
-            if (ctx->sryze_ctx) {
-                sryze_ping_destroy(ctx->sryze_ctx);
-                ctx->sryze_ctx = NULL;
+            if (ctx->ping_ctx) {
+                os_ping_destroy(ctx->ping_ctx);
+                ctx->ping_ctx = NULL;
             }
 
-            ctx->sryze_ctx = sryze_ping_create(ctx->target, 1000);
+            ctx->ping_ctx = os_ping_create(ctx->target, 1000);
             ctx->last_dns_retry = now;
 
-            if (ctx->sryze_ctx) {
+            if (ctx->ping_ctx) {
                 ctx->dns_failed = 0;
             } else {
                 ctx->dns_failed = 1;
                 *value = -1.0;
                 return 0;
             }
-        } else if (!ctx->sryze_ctx) {
+        } else if (!ctx->ping_ctx) {
             *value = -1.0;
             return 0;
         }
     }
 
-    success = sryze_ping_send(ctx->sryze_ctx, &ping_time);
+    success = os_ping_send(ctx->ping_ctx, &ping_time);
 
     *value = success ? ping_time : -1.0;
 
@@ -132,8 +131,8 @@ static void ping_cleanup(void *context) {
     ping_context_t *ctx = (ping_context_t *)context;
     if (!ctx) return;
 
-    if (ctx->sryze_ctx) {
-        sryze_ping_destroy(ctx->sryze_ctx);
+    if (ctx->ping_ctx) {
+        os_ping_destroy(ctx->ping_ctx);
     }
     free(ctx->target);
     free(ctx);

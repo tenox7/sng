@@ -47,4 +47,10 @@ int os_plot_thread_join_timeout(plot_thread_t *thread, uint32_t timeout_ms);
 /* Config path function */
 char *os_get_config_path(const char *filename);
 
+/* Ping functions */
+typedef struct os_ping_context_t os_ping_context_t;
+os_ping_context_t *os_ping_create(const char *hostname, uint32_t timeout_ms);
+int os_ping_send(os_ping_context_t *ctx, double *ping_time_ms);
+void os_ping_destroy(os_ping_context_t *ctx);
+
 #endif /* OS_INTERFACE_H */

@@ -14,7 +14,7 @@ Supports multiple graphs with:
 - macOS/osx
 - FreeBSD
 - Linux
-- Solaris/Illumos/OI
+- Solaris
 - HP-UX
 - AIX
 - UnixWare

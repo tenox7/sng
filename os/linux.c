@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "os_interface.h"
 
 struct plot_mutex_t {

@@ -71,6 +71,11 @@
 /* Integer types - only define if not already defined by system */
 /* Note: On systems with stdint.h, these types are already defined */
 
+/* Ensure UINT32_MAX is defined for all platforms */
+#ifndef UINT32_MAX
+#define UINT32_MAX 4294967295U
+#endif
+
 /* Atomic operations - use regular types for maximum compatibility */
 #ifndef atomic_uint_fast32_t
 #define atomic_uint_fast32_t uint32_t

@@ -5,51 +5,42 @@ LDFLAGS =
 # Platform detection
 UNAME_S ?= $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
-    CFLAGS += -I/opt/homebrew/include -I/opt/homebrew/opt/net-snmp/include -I/opt/homebrew/opt/openssl/include
-    LDFLAGS += -L/opt/homebrew/lib -L/opt/homebrew/opt/net-snmp/lib -L/opt/homebrew/opt/openssl/lib
-    LDFLAGS += -framework CoreFoundation -framework IOKit -lnetsnmp
+    LDFLAGS += -framework CoreFoundation -framework IOKit
 endif
 ifeq ($(UNAME_S),Linux)
     CFLAGS += -DLINUX
     LDFLAGS += -lpthread -lm
-    # Try to add Net-SNMP support if available
-    ifneq ($(shell which net-snmp-config),)
-        CFLAGS += $(shell net-snmp-config --cflags 2>/dev/null)
-        LDFLAGS += $(shell net-snmp-config --libs 2>/dev/null)
-    endif
 endif
 ifeq ($(UNAME_S),FreeBSD)
-    LDFLAGS += -lpthread -lm -lnetsnmp
+    LDFLAGS += -lpthread -lm
 endif
 ifeq ($(UNAME_S),NetBSD)
-    LDFLAGS += -lpthread -lm -lnetsnmp
+    LDFLAGS += -lpthread -lm
 endif
 ifeq ($(UNAME_S),OpenBSD)
-    LDFLAGS += -lpthread -lm -lnetsnmp
+    LDFLAGS += -lpthread -lm
 endif
 ifeq ($(UNAME_S),SunOS)
-    CFLAGS += -I/usr/local/include
-    LDFLAGS += -L/usr/local/lib -lpthread -lm -lsocket -lnsl -lrt -lkstat -lnetsnmp
+    LDFLAGS += -lpthread -lm -lsocket -lnsl -lrt -lkstat
 endif
 ifeq ($(UNAME_S),HP-UX)
-    CFLAGS += -I/usr/local/include
-    LDFLAGS += -L/usr/local/lib -lpthread -lm -lnm -lnetsnmp
+    LDFLAGS += -lpthread -lm -lnm
 endif
 ifeq ($(UNAME_S),AIX)
-    CFLAGS += -I/usr/local/include -pthread
-    LDFLAGS += -L/usr/local/lib -pthread -lm -lnetsnmp
+    CFLAGS += -pthread
+    LDFLAGS += -pthread -lm
 endif
 ifeq ($(UNAME_S),UnixWare)
-    CFLAGS += -I/usr/local/include -DUNIXWARE
-    LDFLAGS += -L/usr/local/lib -lthread -lm -lsocket -lnsl -lelf /usr/local/lib/libnetsnmp.a
+    CFLAGS += -DUNIXWARE
+    LDFLAGS += -lthread -lm -lsocket -lnsl -lelf
 endif
 ifeq ($(UNAME_S),OSF1)
-    CFLAGS += -I/usr/local/include -pthread
-    LDFLAGS += -L/usr/local/lib -pthread -lm -lmach -lnetsnmp
+    CFLAGS += -pthread
+    LDFLAGS += -pthread -lm -lmach
 endif
 ifneq ($(findstring IRIX,$(UNAME_S)),)
-    CFLAGS += -isystem /usr/include -I/usr/local/include -D__STDINT_H__
-    LDFLAGS += -L/usr/local/lib -lpthread -lm -lnetsnmp -lelf
+    CFLAGS += -isystem /usr/include -D__STDINT_H__
+    LDFLAGS += -lpthread -lm -lelf
 endif
 
 # Graphics driver selection
@@ -83,7 +74,7 @@ ifeq ($(GFX),)
     LDFLAGS += -lX11
 endif
 
-SOURCES = main.c graphics.c config.c plot.c ringbuf.c threading.c ini_parser.c datasource.c ds/ping.c ds/cpu.c ds/memory.c ds/snmp.c ds/if_thr.c ds/loadavg.c ds/shell.c ds/clock.c os/os.c
+SOURCES = main.c graphics.c config.c plot.c ringbuf.c threading.c ini_parser.c datasource.c ds/snmp_client.c ds/ping.c ds/cpu.c ds/memory.c ds/snmp.c ds/if_thr.c ds/loadavg.c ds/shell.c ds/clock.c os/os.c
 OBJECTS = $(SOURCES:.c=.o)
 TARGET = sng
 

@@ -22,7 +22,6 @@
 - snmp v2 getifx
 - interface errors, drops, etc local and snmp
 - storage MB/s from iostat
-- own snmp client implementation without net-snmp, maybe use uSNMP library
 - IPv6 ping
 
 

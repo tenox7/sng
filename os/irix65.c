@@ -21,6 +21,11 @@ struct plot_thread_t {
 #include <sys/time.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/sysctl.h>
+#include <net/if.h>
+#include <net/route.h>
+#include <net/if_dl.h>
 
 #define UNIX "/unix"
 #define KMEM "/dev/kmem"
@@ -224,6 +229,59 @@ int os_loadavg_get_stats(double *value) {
 }
 
 int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint32_t* out_bytes) {
+    static char *buf = NULL;
+    static size_t buf_size = 0;
+    int mib[6];
+    size_t len;
+    char *next, *lim;
+    struct if_msghdr *ifm;
+    struct sockaddr_dl *sdl;
+    char ifname[32];
+
+    mib[0] = CTL_NET;
+    mib[1] = PF_ROUTE;
+    mib[2] = 0;
+    mib[3] = 0;
+    mib[4] = NET_RT_IFLIST;
+    mib[5] = 0;
+
+    if (sysctl(mib, 6, NULL, &len, NULL, 0) < 0)
+        return 0;
+
+    if (len > buf_size) {
+        char *new_buf;
+        new_buf = realloc(buf, len);
+        if (!new_buf)
+            return 0;
+        buf = new_buf;
+        buf_size = len;
+    }
+
+    len = buf_size;
+    if (sysctl(mib, 6, buf, &len, NULL, 0) < 0)
+        return 0;
+
+    lim = buf + len;
+    for (next = buf; next < lim;) {
+        ifm = (struct if_msghdr *)next;
+
+        if (ifm->ifm_type == RTM_IFINFO) {
+            sdl = (struct sockaddr_dl *)(ifm + 1);
+            if (sdl->sdl_family == AF_LINK) {
+                memcpy(ifname, sdl->sdl_data, sdl->sdl_nlen);
+                ifname[sdl->sdl_nlen] = '\0';
+
+                if (strcmp(ifname, interface_name) == 0) {
+                    *in_bytes = (uint32_t)ifm->ifm_data.ifi_ibytes;
+                    *out_bytes = (uint32_t)ifm->ifm_data.ifi_obytes;
+                    return 1;
+                }
+            }
+        }
+
+        next += ifm->ifm_msglen;
+    }
+
     return 0;
 }
 

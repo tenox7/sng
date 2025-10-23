@@ -9,6 +9,13 @@
 #include <string.h>
 
 typedef struct {
+    uint8_t r, g, b, a;
+    unsigned long pixel;
+} color_cache_entry_t;
+
+#define COLOR_CACHE_SIZE 256
+
+typedef struct {
     Display *display;
     Window window;
     Pixmap pixmap;
@@ -20,11 +27,14 @@ typedef struct {
     int should_quit;
     unsigned long bg_color;
     Atom wm_delete_window;
+    color_cache_entry_t color_cache[COLOR_CACHE_SIZE];
+    int color_cache_count;
 } x11_window_context_t;
 
 typedef struct {
     x11_window_context_t *window_context;
     unsigned long current_color;
+    unsigned long last_set_color;
 } x11_renderer_context_t;
 
 typedef struct {
@@ -52,27 +62,43 @@ static uint64_t x11_get_time_ms(void) {
     return (uint64_t)(tv.tv_sec * 1000 + tv.tv_usec / 1000);
 }
 
-static unsigned long x11_create_color(Display *display, int screen, color_t color) {
+static unsigned long x11_create_color_cached(x11_window_context_t *ctx, color_t color) {
     Colormap colormap;
     XColor xcolor;
     int brightness;
+    int i;
 
-    colormap = DefaultColormap(display, screen);
+    for (i = 0; i < ctx->color_cache_count; i++) {
+        if (ctx->color_cache[i].r == color.r &&
+            ctx->color_cache[i].g == color.g &&
+            ctx->color_cache[i].b == color.b) {
+            return ctx->color_cache[i].pixel;
+        }
+    }
+
+    colormap = DefaultColormap(ctx->display, ctx->screen);
 
     xcolor.red = color.r << 8;
     xcolor.green = color.g << 8;
     xcolor.blue = color.b << 8;
     xcolor.flags = DoRed | DoGreen | DoBlue;
 
-    if (XAllocColor(display, colormap, &xcolor)) {
+    if (XAllocColor(ctx->display, colormap, &xcolor)) {
+        if (ctx->color_cache_count < COLOR_CACHE_SIZE) {
+            ctx->color_cache[ctx->color_cache_count].r = color.r;
+            ctx->color_cache[ctx->color_cache_count].g = color.g;
+            ctx->color_cache[ctx->color_cache_count].b = color.b;
+            ctx->color_cache[ctx->color_cache_count].pixel = xcolor.pixel;
+            ctx->color_cache_count++;
+        }
         return xcolor.pixel;
     }
 
     brightness = (color.r + color.g + color.b) / 3;
     if (brightness < 128) {
-        return BlackPixel(display, screen);
+        return BlackPixel(ctx->display, ctx->screen);
     } else {
-        return WhitePixel(display, screen);
+        return WhitePixel(ctx->display, ctx->screen);
     }
 }
 
@@ -119,6 +145,7 @@ window_t *window_create(const char *title, int32_t width, int32_t height) {
     ctx->width = width;
     ctx->height = height;
     ctx->should_quit = 0;
+    ctx->color_cache_count = 0;
 
     root = RootWindow(ctx->display, ctx->screen);
     ctx->bg_color = WhitePixel(ctx->display, ctx->screen);
@@ -334,6 +361,7 @@ renderer_t *renderer_create(window_t *window) {
 
     ctx->window_context = (x11_window_context_t*)window->handle;
     ctx->current_color = BlackPixel(ctx->window_context->display, ctx->window_context->screen);
+    ctx->last_set_color = ctx->current_color;
 
     renderer->handle = ctx;
     return renderer;
@@ -358,10 +386,12 @@ void renderer_clear(renderer_t *renderer, color_t color) {
     if (!renderer) return;
 
     ctx = (x11_renderer_context_t*)renderer->handle;
-    x11_color = x11_create_color(ctx->window_context->display,
-                                 ctx->window_context->screen, color);
+    x11_color = x11_create_color_cached(ctx->window_context, color);
 
-    XSetForeground(ctx->window_context->display, ctx->window_context->gc, x11_color);
+    if (x11_color != ctx->last_set_color) {
+        XSetForeground(ctx->window_context->display, ctx->window_context->gc, x11_color);
+        ctx->last_set_color = x11_color;
+    }
     XFillRectangle(ctx->window_context->display, ctx->window_context->pixmap,
                    ctx->window_context->gc, 0, 0,
                    ctx->window_context->width, ctx->window_context->height);
@@ -391,19 +421,27 @@ void renderer_set_color(renderer_t *renderer, color_t color) {
     if (!renderer) return;
 
     ctx = (x11_renderer_context_t*)renderer->handle;
-    ctx->current_color = x11_create_color(ctx->window_context->display,
-                                         ctx->window_context->screen, color);
+    ctx->current_color = x11_create_color_cached(ctx->window_context, color);
 }
 
 void renderer_draw_line(renderer_t *renderer, int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
     x11_renderer_context_t *ctx;
+    XSegment seg;
 
     if (!renderer) return;
 
     ctx = (x11_renderer_context_t*)renderer->handle;
-    XSetForeground(ctx->window_context->display, ctx->window_context->gc, ctx->current_color);
-    XDrawLine(ctx->window_context->display, ctx->window_context->pixmap,
-              ctx->window_context->gc, x1, y1, x2, y2);
+    if (ctx->current_color != ctx->last_set_color) {
+        XSetForeground(ctx->window_context->display, ctx->window_context->gc, ctx->current_color);
+        ctx->last_set_color = ctx->current_color;
+    }
+
+    seg.x1 = x1;
+    seg.y1 = y1;
+    seg.x2 = x2;
+    seg.y2 = y2;
+    XDrawSegments(ctx->window_context->display, ctx->window_context->pixmap,
+                  ctx->window_context->gc, &seg, 1);
 }
 
 void renderer_draw_rect(renderer_t *renderer, rect_t rect) {
@@ -412,7 +450,10 @@ void renderer_draw_rect(renderer_t *renderer, rect_t rect) {
     if (!renderer) return;
 
     ctx = (x11_renderer_context_t*)renderer->handle;
-    XSetForeground(ctx->window_context->display, ctx->window_context->gc, ctx->current_color);
+    if (ctx->current_color != ctx->last_set_color) {
+        XSetForeground(ctx->window_context->display, ctx->window_context->gc, ctx->current_color);
+        ctx->last_set_color = ctx->current_color;
+    }
     XDrawRectangle(ctx->window_context->display, ctx->window_context->pixmap,
                    ctx->window_context->gc, rect.x, rect.y, rect.w, rect.h);
 }
@@ -423,7 +464,10 @@ void renderer_fill_rect(renderer_t *renderer, rect_t rect) {
     if (!renderer) return;
 
     ctx = (x11_renderer_context_t*)renderer->handle;
-    XSetForeground(ctx->window_context->display, ctx->window_context->gc, ctx->current_color);
+    if (ctx->current_color != ctx->last_set_color) {
+        XSetForeground(ctx->window_context->display, ctx->window_context->gc, ctx->current_color);
+        ctx->last_set_color = ctx->current_color;
+    }
     XFillRectangle(ctx->window_context->display, ctx->window_context->pixmap,
                    ctx->window_context->gc, rect.x, rect.y, rect.w, rect.h);
 }
@@ -554,10 +598,12 @@ void font_draw_text(renderer_t *renderer, font_t *font, color_t color,
     if (!rctx || !fctx) return;
     if (!fctx->font_struct) return;
 
-    text_color = x11_create_color(rctx->window_context->display,
-                                               rctx->window_context->screen, color);
+    text_color = x11_create_color_cached(rctx->window_context, color);
 
-    XSetForeground(rctx->window_context->display, rctx->window_context->gc, text_color);
+    if (text_color != rctx->last_set_color) {
+        XSetForeground(rctx->window_context->display, rctx->window_context->gc, text_color);
+        rctx->last_set_color = text_color;
+    }
     XSetFont(rctx->window_context->display, rctx->window_context->gc, fctx->font_struct->fid);
 
     y += fctx->font_struct->ascent;

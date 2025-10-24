@@ -32,7 +32,7 @@ ifeq ($(UNAME_S),AIX)
 endif
 ifeq ($(UNAME_S),UnixWare)
     CFLAGS += -DUNIXWARE
-    LDFLAGS += -lthread -lm -lsocket -lnsl -lelf
+    LDFLAGS += -lthread -lm -lsocket -lnsl -lelf -lmas
 endif
 ifeq ($(UNAME_S),OSF1)
     CFLAGS += -pthread

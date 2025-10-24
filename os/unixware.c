@@ -16,6 +16,10 @@ struct plot_thread_t {
 #include <sys/time.h>
 #include <sys/select.h>
 #include <thread.h>
+#include <sys/mman.h>
+#include <sys/dl.h>
+#include <mas.h>
+#include <metreg.h>
 
 #ifndef USYNC_THREAD
 #define USYNC_THREAD 0
@@ -28,27 +32,133 @@ struct plot_thread_t {
 
 #define UNIX_KERNEL "/stand/unix"
 #define KMEM "/dev/kmem"
+#define CPUSTATES 4
+
+static int mas_fd = -1;
+static uint32_t ncpu = 0;
+static uint32_t cp_old[CPUSTATES];
+static int mas_initialized = 0;
 
 const char* os_get_platform_name(void) {
     return "unixware";
 }
 
 int os_init(void) {
+    uint32_t *ncpu_p;
+    int i;
+
+    if (mas_initialized)
+        return 1;
+
+    mas_fd = mas_open(MAS_FILE, MAS_MMAP_ACCESS);
+    if (mas_fd < 0) {
+        return 0;
+    }
+
+    ncpu_p = (uint32_t *)mas_get_met(mas_fd, NCPU, 0);
+    if (!ncpu_p) {
+        mas_close(mas_fd);
+        mas_fd = -1;
+        return 0;
+    }
+    ncpu = (uint32_t)(*(short *)ncpu_p);
+
+    for (i = 0; i < CPUSTATES; i++) {
+        cp_old[i] = 0;
+    }
+
+    mas_initialized = 1;
     return 1;
 }
 
 void os_cleanup(void) {
+    if (mas_fd >= 0) {
+        mas_close(mas_fd);
+        mas_fd = -1;
+    }
+    mas_initialized = 0;
+}
+
+static uint32_t get_cpu_metric(metid_t type) {
+    uint32_t total;
+    uint32_t *p;
+    int i;
+
+    total = 0;
+    for (i = 0; i < ncpu; i++) {
+        p = (uint32_t *)mas_get_met(mas_fd, type, i);
+        if (p) {
+            total += *p;
+        }
+    }
+    return total;
+}
+
+static void calculate_cpu_percentages(uint32_t *new_vals, double *percentages) {
+    uint32_t total_change;
+    uint32_t half_total;
+    int i;
+
+    total_change = 0;
+    for (i = 0; i < CPUSTATES; i++) {
+        total_change += (new_vals[i] - cp_old[i]);
+    }
+
+    if (total_change == 0) {
+        for (i = 0; i < CPUSTATES; i++) {
+            percentages[i] = 0.0;
+        }
+        return;
+    }
+
+    half_total = total_change / 2;
+    for (i = 0; i < CPUSTATES; i++) {
+        percentages[i] = ((new_vals[i] - cp_old[i]) * 1000 + half_total) / total_change;
+        percentages[i] = percentages[i] / 10.0;
+        cp_old[i] = new_vals[i];
+    }
 }
 
 int os_cpu_get_stats(double *value) {
-    *value = 0.0;
-    return 0;
+    uint32_t cpu_states[CPUSTATES];
+    double percentages[CPUSTATES];
+
+    if (!mas_initialized || mas_fd < 0) {
+        *value = 0.0;
+        return 0;
+    }
+
+    cpu_states[0] = get_cpu_metric(MPC_CPU_IDLE);
+    cpu_states[1] = get_cpu_metric(MPC_CPU_USR);
+    cpu_states[2] = get_cpu_metric(MPC_CPU_SYS);
+    cpu_states[3] = get_cpu_metric(MPC_CPU_WIO);
+
+    calculate_cpu_percentages(cpu_states, percentages);
+
+    *value = 100.0 - percentages[0];
+    return 1;
 }
 
 int os_cpu_get_stats_dual(double *total_value, double *system_value) {
-    *total_value = 0.0;
-    *system_value = 0.0;
-    return 0;
+    uint32_t cpu_states[CPUSTATES];
+    double percentages[CPUSTATES];
+
+    if (!mas_initialized || mas_fd < 0) {
+        *total_value = 0.0;
+        *system_value = 0.0;
+        return 0;
+    }
+
+    cpu_states[0] = get_cpu_metric(MPC_CPU_IDLE);
+    cpu_states[1] = get_cpu_metric(MPC_CPU_USR);
+    cpu_states[2] = get_cpu_metric(MPC_CPU_SYS);
+    cpu_states[3] = get_cpu_metric(MPC_CPU_WIO);
+
+    calculate_cpu_percentages(cpu_states, percentages);
+
+    *total_value = 100.0 - percentages[0];
+    *system_value = percentages[2];
+    return 1;
 }
 
 int os_memory_get_stats(double *value) {

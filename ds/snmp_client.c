@@ -41,7 +41,7 @@ static int encode_integer(unsigned char *buf, uint32_t val) {
     uint32_t temp;
     unsigned char t;
 
-    p = buf + 1;
+    p = buf + 2;
     len = 0;
 
     if (val == 0) {

@@ -2,15 +2,13 @@
 
 ## Bugs
 
+- SNMP on FreeBSD
 
 ## Features
 
-- Makefile is a mess restructurj
-- perhaps make makefiles per platform eg Makefile.aix, etc include frommain
-- allow buildingin without net-snmp / remove source
-
-- vertical scale fine controls, auto, margin, max, hardmax
+- makefiles per platform eg Makefile.aix
 - vertical bar with latest value
+- vertical scale fine controls, auto, margin, max, hardmax
 - horizontal guides ie softmax or ncpu for load
 - logarithmic ringbuf
 - save ringbuf to file
@@ -21,8 +19,8 @@
 - modern stats like temperature, wifi signal, battery level
 - snmp v2 getifx
 - interface errors, drops, etc local and snmp
-- storage MB/s from iostat
-- IPv6 ping
+- storage: IOPS, MB/s from iostat
+- IPv6 support
 
 
 ## Platforms

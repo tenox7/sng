@@ -9,15 +9,19 @@
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#if defined(__hpux) || defined(UNIXWARE) || defined(__osf__) || defined(__digital__) || defined(sgi) || defined(__sgi)
+#if defined(__hpux) || defined(UNIXWARE) || defined(__osf__) || defined(__digital__) || defined(sgi) || defined(__sgi) || defined(__sun) || defined(sun)
 #include <netinet/in_systm.h>
 #endif
 #include <netinet/ip.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#if defined(_AIX) || defined(__osf__) || defined(__digital__)
+#if (defined(_AIX) && !defined(_AIX43)) || defined(__osf__) || defined(__digital__)
 typedef int socklen_t;
+#endif
+
+#ifndef INET_ADDRSTRLEN
+#define INET_ADDRSTRLEN 16
 #endif
 
 struct icmp {

@@ -26,6 +26,8 @@
 
 ## Platforms
 
+- OpenServer/OpenDesktop
+- NextStep/OpenStep
 - Win32/NT
 - Plan9
 - RiscOS

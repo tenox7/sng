@@ -21,7 +21,7 @@ ifeq ($(UNAME_S),OpenBSD)
     LDFLAGS += -lpthread -lm
 endif
 ifeq ($(UNAME_S),SunOS)
-    LDFLAGS += -lpthread -lm -lsocket -lnsl -lrt -lkstat
+    LDFLAGS += -lpthread -lm -lsocket -lnsl -lrt -lkstat -lresolv
 endif
 ifeq ($(UNAME_S),HP-UX)
     LDFLAGS += -lpthread -lm -lnm
@@ -40,7 +40,7 @@ ifeq ($(UNAME_S),OSF1)
 endif
 ifneq ($(findstring IRIX,$(UNAME_S)),)
     CFLAGS += -isystem /usr/include -D__STDINT_H__
-    LDFLAGS += -lpthread -lm -lelf
+    LDFLAGS += -lpthread -lelf
 endif
 
 # Graphics driver selection

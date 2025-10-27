@@ -145,12 +145,6 @@ Also you should switch from Wayland to Xorg in `raspi-config`.
 
 ## Development libraries
 
-### Net-SNMP 
-
-```
-apt install libsnmp-dev
-```
-
 ### SDL2
 
 ```

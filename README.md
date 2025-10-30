@@ -188,4 +188,5 @@ SNG is inspired by:
 - [STG](http://leonidvm.chat.ru/)
 - [SRG](https://sourceforge.net/projects/snmprg/)
 - [Conky](https://github.com/brndnmtthws/conky)
+- [GKrellM](https://gkrellm.srcbox.net/)
 

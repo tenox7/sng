@@ -124,6 +124,6 @@ app: $(TARGET)
 # Create .dmg from .app bundle
 dmg: app
 	rm -f $(APP_NAME).dmg
-	hdiutil create -srcfolder $(BUNDLE_DIR) -volname "$(APP_NAME)" -format UDZO $(APP_NAME).dmg
+	hdiutil create -srcfolder $(BUNDLE_DIR) -volname "$(APP_NAME)" -format UDZO sng-macos.dmg
 
 .PHONY: all clean install app dmg

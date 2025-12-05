@@ -219,8 +219,8 @@ config_t *config_load(const char *filename) {
     config->line_color = (color_t){0, 255, 0, 255};
     config->line_color_secondary = (color_t){0, 0, 255, 255};
     config->error_line_color = (color_t){255, 0, 0, 255};
-    config->default_height = 100;
-    config->default_width = 400;
+    config->default_height = 80;
+    config->default_width = 300;
     config->refresh_interval_ms = 10000;
     config->window_margin = 5;
     config->max_fps = 30;

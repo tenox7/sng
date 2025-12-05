@@ -9,6 +9,8 @@ Supports multiple graphs with:
 - Some local stats like CPU, Mem, Load Avg
 - Shell commands
 
+![SNG Screenshot](sng1.png)
+
 ## Supported OS
 
 - macOS/osx

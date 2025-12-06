@@ -121,6 +121,8 @@ SNG supports many UI/Graphics backends. Not all of them behave so nicely. If you
 
 I run SNG on Raspberry PI with [HyperPixel4](https://shop.pimoroni.com/products/hyperpixel-4?variant=12569485443155) display. This display is super crisp and sharp but doesn't use HDMI video. Instead has it's own driver, which is good, but works with Raspbian only.
 
+![SNG RPI](sngpi.jpg)
+
 To auto start add this:
 
 ```

@@ -107,15 +107,11 @@ You can also specify the location with `-f /full/path/to/sng.ini`
 - `height` - pixels
 - `refresh_interval_sec` - seconds
 
-## Max value autoscale
-
-At present the "max" value and the vertical scale is computed based on lifetime max value and never decreases. This is probably not the best choice, however I find it work quite well in practice. It provides indication of how high the metric has ever gotten in the past.
-
 ## Performance Considerations
 
 This app is meant to be running in background or on a stand alone display. As such, its optimized to consume as little resources as possible rather than be a fast and responsive UI.
 
-SNG supports many UI/Graphics backends. Not all of them behave so nicely. If you care about low CPU usage, wasted cycles, power usage - prefer GFX=X11, then GTK3. Avoid SDL. Its designed for high performance games running at 60 FPS and it's pretty hard to make it yeld CPU back it will use more CPU cycles on idle.
+SNG supports many UI/Graphics backends. Not all of them behave nicely. If you care about low CPU usage, wasted cycles, power usage - prefer GFX=X11, then GTK3. Avoid SDL - it's not a GUI framework but a multimedia/game library designed for high performance.  It's pretty hard to make it yeld CPU back. SDL will use more CPU cycles on idle.
 
 ## Devices
 
@@ -187,9 +183,9 @@ apt install fontconfig pkg-config
 SNG is inspired by:
 
 - [SunOS Performance Meter](https://web.archive.org/web/20121207213342/https://docs.oracle.com/cd/E19683-01/806-4743/perfmeterusing-64/index.html)
-- DEC Unix / Tru64 cpuinfo
+- DEC Unix / Tru64 `cpuinfo`
 - [xosview](https://xosview.sourceforge.net/) and originally IRIX gr_osview
-- Plan 9 stats, gping 
+- Plan 9 `stats`, `gping` 
 - [STG](http://leonidvm.chat.ru/)
 - [SRG](https://sourceforge.net/projects/snmprg/)
 - [Conky](https://github.com/brndnmtthws/conky)

@@ -124,17 +124,31 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
         unit = "";
     }
 
+    if (!ringbuf_read_snapshot(plot->data_buffer, temp_buffer, 2048, &data_count, &head_pos, &tail_pos))
+        return;
+
+    if (plot->is_dual && plot->data_buffer_secondary) {
+        if (!ringbuf_read_snapshot(plot->data_buffer_secondary, temp_buffer_secondary, 2048,
+                                  &data_count_secondary, &head_pos_secondary, &tail_pos_secondary))
+            return;
+    }
+
     if (fixed_max_scale > 0.0) {
         max_val = fixed_max_scale;
     } else {
-        if (plot->is_dual) {
-            max_primary = plot_stats_cache[plot_index].max_value;
-            max_secondary = plot_stats_cache[plot_index].max_value_secondary;
-            max_val = (max_primary > max_secondary) ? max_primary : max_secondary;
-            if (max_val <= 0) max_val = 1.0;
-        } else {
-            max_val = plot_stats_cache[plot_index].max_value > 0 ? plot_stats_cache[plot_index].max_value : 1.0;
+        max_val = 0.0;
+        for (i = 0; i < data_count; i++) {
+            if (temp_buffer[i] > max_val)
+                max_val = temp_buffer[i];
         }
+        if (plot->is_dual) {
+            for (i = 0; i < data_count_secondary; i++) {
+                if (temp_buffer_secondary[i] > max_val)
+                    max_val = temp_buffer_secondary[i];
+            }
+        }
+        if (max_val <= 0.0)
+            max_val = 1.0;
     }
 
     if (plot->data_source && plot->data_source->datasource && plot->data_source->datasource->handler->format_value) {
@@ -152,15 +166,7 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
     scale_x = x + width - scale_text_width;
     font_draw_text(renderer, font, global_config->text_color, scale_x, y + 5, scale_text);
 
-    if (!ringbuf_read_snapshot(plot->data_buffer, temp_buffer, 2048, &data_count, &head_pos, &tail_pos)) {
-        return;
-    }
-
     if (plot->is_dual && plot->data_buffer_secondary) {
-        if (!ringbuf_read_snapshot(plot->data_buffer_secondary, temp_buffer_secondary, 2048,
-                                  &data_count_secondary, &head_pos_secondary, &tail_pos_secondary)) {
-            return;
-        }
         prev_out_x = -1;
         prev_out_y = -1;
 

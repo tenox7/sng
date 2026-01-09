@@ -225,7 +225,14 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
     if (plot->data_source && plot->data_source->datasource && plot->data_source->datasource->handler->format_value) {
         plot->data_source->datasource->handler->format_value(plot_stats_cache[plot_index].avg_value, avg_formatted, sizeof(avg_formatted));
         plot->data_source->datasource->handler->format_value(plot_stats_cache[plot_index].last_value, last_formatted, sizeof(last_formatted));
-        snprintf(stats_text, sizeof(stats_text), "%s", last_formatted);
+        if (plot->is_dual && plot->data_source->datasource->handler->format_dual_stats) {
+            plot->data_source->datasource->handler->format_dual_stats(
+                plot_stats_cache[plot_index].last_value,
+                plot_stats_cache[plot_index].last_value_secondary,
+                stats_text, sizeof(stats_text));
+        } else {
+            snprintf(stats_text, sizeof(stats_text), "%s", last_formatted);
+        }
     } else {
         if (plot->data_source && plot->data_source->datasource) {
             unit = datasource_get_unit(plot->data_source->datasource);

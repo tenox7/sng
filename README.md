@@ -186,7 +186,7 @@ SNG is inspired by:
 - DEC Unix / Tru64 `cpuinfo`
 - [xosview](https://xosview.sourceforge.net/) and originally IRIX gr_osview
 - Plan 9 `stats`, `gping` 
-- [STG](http://leonidvm.chat.ru/)
+- [STG](https://web.archive.org/web/20251107035212/http://leonidvm.chat.ru/)
 - [SRG](https://sourceforge.net/projects/snmprg/)
 - [Conky](https://github.com/brndnmtthws/conky)
 - [GKrellM](https://gkrellm.srcbox.net/)

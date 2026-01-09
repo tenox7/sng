@@ -21,6 +21,7 @@ typedef struct {
     int (*collect_dual)(void *context, double *value1, double *value2);
     int (*get_stats)(void *context, datasource_stats_t *stats);
     void (*format_value)(double value, char *buffer, size_t buffer_size);
+    void (*format_dual_stats)(double value1, double value2, char *buffer, size_t buffer_size);
     double (*get_max_scale)(void *context);
     void (*cleanup)(void *context);
     const char *name;

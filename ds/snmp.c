@@ -241,12 +241,21 @@ static void snmp_format_value(double value, char *buffer, size_t buffer_size) {
     format_rate_human_readable(value, buffer, buffer_size);
 }
 
+static void snmp_format_dual_stats(double in_value, double out_value, char *buffer, size_t buffer_size) {
+    char in_str[32];
+    char out_str[32];
+    format_rate_human_readable(in_value, in_str, sizeof(in_str));
+    format_rate_human_readable(out_value, out_str, sizeof(out_str));
+    snprintf(buffer, buffer_size, "IN:%s OUT:%s", in_str, out_str);
+}
+
 datasource_handler_t snmp_handler = {
     .init = snmp_init,
     .collect = snmp_collect,
     .collect_dual = snmp_collect_dual,
     .get_stats = snmp_get_stats,
     .format_value = snmp_format_value,
+    .format_dual_stats = snmp_format_dual_stats,
     .cleanup = snmp_cleanup,
     .name = "snmp",
     .unit = "B/s",

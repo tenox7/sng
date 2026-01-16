@@ -167,14 +167,16 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
     font_draw_text(renderer, font, global_config->text_color, scale_x, y + 5, scale_text);
 
     if (plot->is_dual && plot->data_buffer_secondary) {
+        uint32_t dual_count;
         prev_out_x = -1;
         prev_out_y = -1;
+        dual_count = (data_count < data_count_secondary) ? data_count : data_count_secondary;
 
-        for (i = 0; i < data_count; i++) {
+        for (i = 0; i < dual_count; i++) {
             in_value = temp_buffer[i];
             out_value = temp_buffer_secondary[i];
 
-            plot_x = x + width - 2 - (data_count - 1 - i);
+            plot_x = x + width - 2 - (dual_count - 1 - i);
             plot_bottom = plot_y + plot_height - 2;
 
             if (in_value < 0 || out_value < 0) {
@@ -583,6 +585,9 @@ int plot_system_update(plot_system_t *system) {
             for (i = 0; i < system->plot_count; i++) {
                 if (system->plots[i].data_buffer) {
                     ringbuf_resize(system->plots[i].data_buffer, new_buffer_size);
+                }
+                if (system->plots[i].data_buffer_secondary) {
+                    ringbuf_resize(system->plots[i].data_buffer_secondary, new_buffer_size);
                 }
             }
         }

@@ -112,12 +112,17 @@ static void cpu_format_value(double value, char *buffer, size_t buffer_size) {
     snprintf(buffer, buffer_size, "%.1f%%", value);
 }
 
+static void cpu_format_dual_stats(double total, double system, char *buffer, size_t buffer_size) {
+    snprintf(buffer, buffer_size, "%.1f%%/%.1f%%", total, system);
+}
+
 datasource_handler_t cpu_handler = {
     .init = cpu_init,
     .collect = cpu_collect,
     .collect_dual = cpu_collect_dual,
     .get_stats = cpu_get_stats,
     .format_value = cpu_format_value,
+    .format_dual_stats = cpu_format_dual_stats,
     .cleanup = cpu_cleanup,
     .name = "cpu",
     .unit = "%",

@@ -185,6 +185,15 @@ static void clock_format_value(double value, char *buffer, size_t buffer_size) {
     snprintf(buffer, buffer_size, "%.2f", value);
 }
 
+static void clock_format_dual_stats(double hours, double scaled_minutes, char *buffer, size_t buffer_size) {
+    int h, m;
+    double scale;
+    h = (int)hours;
+    scale = (hours > 12 || scaled_minutes > 12) ? 24.0 : 12.0;
+    m = (int)(scaled_minutes * 60.0 / scale);
+    snprintf(buffer, buffer_size, "%d:%02d", h, m);
+}
+
 static double clock_get_max_scale(void *context) {
     clock_context_t *ctx;
 
@@ -200,6 +209,7 @@ datasource_handler_t clock_handler = {
     .collect_dual = clock_collect_dual,
     .get_stats = clock_get_stats,
     .format_value = clock_format_value,
+    .format_dual_stats = clock_format_dual_stats,
     .get_max_scale = clock_get_max_scale,
     .cleanup = clock_cleanup,
     .name = "clock",

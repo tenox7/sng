@@ -246,7 +246,7 @@ static void snmp_format_dual_stats(double in_value, double out_value, char *buff
     char out_str[32];
     format_rate_human_readable(in_value, in_str, sizeof(in_str));
     format_rate_human_readable(out_value, out_str, sizeof(out_str));
-    snprintf(buffer, buffer_size, "IN:%s OUT:%s", in_str, out_str);
+    snprintf(buffer, buffer_size, "%s/%s", in_str, out_str);
 }
 
 datasource_handler_t snmp_handler = {

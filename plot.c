@@ -298,8 +298,10 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
 
         offset_from_right = (x + width - 2) - hover_x;
         if (offset_from_right >= 0 && offset_from_right < (int32_t)data_count) {
+            double hover_value_secondary;
             data_index = data_count - 1 - offset_from_right;
             hover_value = temp_buffer[data_index];
+            hover_value_secondary = (plot->is_dual && data_index < data_count_secondary) ? temp_buffer_secondary[data_index] : 0.0;
 
             time_offset_ms = offset_from_right * refresh_interval;
             time_seconds = time_offset_ms / 1000;
@@ -316,7 +318,9 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
                 snprintf(time_text, sizeof(time_text), "%uh%um ago", time_hours, time_minutes % 60);
             }
 
-            if (plot->data_source && plot->data_source->datasource && plot->data_source->datasource->handler->format_value) {
+            if (plot->is_dual && plot->data_source && plot->data_source->datasource && plot->data_source->datasource->handler->format_dual_stats) {
+                plot->data_source->datasource->handler->format_dual_stats(hover_value, hover_value_secondary, value_text, sizeof(value_text));
+            } else if (plot->data_source && plot->data_source->datasource && plot->data_source->datasource->handler->format_value) {
                 plot->data_source->datasource->handler->format_value(hover_value, value_text, sizeof(value_text));
             } else {
                 if (strlen(unit) > 0) {

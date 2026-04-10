@@ -1,7 +1,7 @@
 CC=cl
 CFLAGS=/DGFX_WIN32 /D_WIN32 /DNO_SHELL /D_CRT_SECURE_NO_WARNINGS /I. /W3 /nologo
 LDFLAGS=/nologo
-LIBS=user32.lib gdi32.lib kernel32.lib ws2_32.lib iphlpapi.lib
+LIBS=user32.lib gdi32.lib kernel32.lib ws2_32.lib iphlpapi.lib pdh.lib
 
 OBJS=main.obj graphics.obj config.obj plot.obj ringbuf.obj threading.obj \
      ini_parser.obj datasource.obj clock.obj snmp_client.obj ping.obj \
@@ -12,7 +12,7 @@ TARGET=sng.exe
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) $(LDFLAGS) $(OBJS) $(LIBS) /Fe$(TARGET)
+	$(CC) $(LDFLAGS) $(OBJS) $(LIBS) /Fe$(TARGET) /link /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup
 
 main.obj: main.c
 	$(CC) $(CFLAGS) /c main.c

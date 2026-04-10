@@ -2,11 +2,17 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
+#include <iphlpapi.h>
 #include <ipexport.h>
 #include <icmpapi.h>
+#include <pdh.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static uint64_t ft_to_u64(const FILETIME *ft) {
+    return ((uint64_t)ft->dwHighDateTime << 32) | ft->dwLowDateTime;
+}
 
 struct plot_mutex_t {
     CRITICAL_SECTION cs;
@@ -32,35 +38,152 @@ void os_cleanup(void) {
 }
 
 int os_cpu_get_stats(double *value) {
+    static uint64_t prev_idle = 0, prev_total = 0;
+    FILETIME idle_ft, kernel_ft, user_ft;
+    uint64_t idle, kernel, user, total;
+    uint64_t idle_diff, total_diff;
+
     if (!value) return 0;
-    *value = 0.0;
-    return 0;
+    if (!GetSystemTimes(&idle_ft, &kernel_ft, &user_ft)) return 0;
+
+    idle = ft_to_u64(&idle_ft);
+    kernel = ft_to_u64(&kernel_ft);
+    user = ft_to_u64(&user_ft);
+    total = kernel + user;
+
+    if (prev_total != 0) {
+        idle_diff = idle - prev_idle;
+        total_diff = total - prev_total;
+        if (total_diff > 0) {
+            *value = 100.0 * (1.0 - (double)idle_diff / (double)total_diff);
+        } else {
+            *value = 0.0;
+        }
+    } else {
+        *value = 0.0;
+    }
+
+    prev_idle = idle;
+    prev_total = total;
+
+    if (*value > 100.0) *value = 100.0;
+    if (*value < 0.0) *value = 0.0;
+    return 1;
 }
 
 int os_cpu_get_stats_dual(double *total_value, double *system_value) {
+    static uint64_t prev_idle = 0, prev_kernel = 0, prev_total = 0;
+    FILETIME idle_ft, kernel_ft, user_ft;
+    uint64_t idle, kernel, user, total;
+    uint64_t idle_diff, total_diff, sys_diff;
+
     if (!total_value || !system_value) return 0;
-    *total_value = 0.0;
-    *system_value = 0.0;
-    return 0;
+    if (!GetSystemTimes(&idle_ft, &kernel_ft, &user_ft)) return 0;
+
+    idle = ft_to_u64(&idle_ft);
+    kernel = ft_to_u64(&kernel_ft);
+    user = ft_to_u64(&user_ft);
+    total = kernel + user;
+
+    if (prev_total != 0) {
+        idle_diff = idle - prev_idle;
+        total_diff = total - prev_total;
+        sys_diff = (kernel - prev_kernel) - idle_diff;
+        if (total_diff > 0) {
+            *total_value = 100.0 * (1.0 - (double)idle_diff / (double)total_diff);
+            *system_value = 100.0 * (double)sys_diff / (double)total_diff;
+        } else {
+            *total_value = 0.0;
+            *system_value = 0.0;
+        }
+    } else {
+        *total_value = 0.0;
+        *system_value = 0.0;
+    }
+
+    prev_idle = idle;
+    prev_kernel = kernel;
+    prev_total = total;
+
+    if (*total_value > 100.0) *total_value = 100.0;
+    if (*total_value < 0.0) *total_value = 0.0;
+    if (*system_value > 100.0) *system_value = 100.0;
+    if (*system_value < 0.0) *system_value = 0.0;
+    return 1;
 }
 
 int os_memory_get_stats(double *value) {
+    MEMORYSTATUSEX ms;
+
     if (!value) return 0;
-    *value = 0.0;
-    return 0;
+    ms.dwLength = sizeof(ms);
+    if (!GlobalMemoryStatusEx(&ms)) return 0;
+
+    if (ms.ullTotalPhys == 0) return 0;
+    *value = 100.0 * (double)(ms.ullTotalPhys - ms.ullAvailPhys) / (double)ms.ullTotalPhys;
+
+    if (*value > 100.0) *value = 100.0;
+    if (*value < 0.0) *value = 0.0;
+    return 1;
 }
 
 int os_loadavg_get_stats(double *value) {
+    static PDH_HQUERY query = NULL;
+    static PDH_HCOUNTER counter = NULL;
+    PDH_FMT_COUNTERVALUE val;
+
     if (!value) return 0;
-    *value = 0.0;
-    return 0;
+
+    if (!query) {
+        if (PdhOpenQueryA(NULL, 0, &query) != ERROR_SUCCESS) {
+            query = NULL;
+            return 0;
+        }
+        if (PdhAddEnglishCounterA(query, "\\System\\Processor Queue Length", 0, &counter) != ERROR_SUCCESS) {
+            PdhCloseQuery(query);
+            query = NULL;
+            return 0;
+        }
+        PdhCollectQueryData(query);
+    }
+
+    if (PdhCollectQueryData(query) != ERROR_SUCCESS) return 0;
+    if (PdhGetFormattedCounterValue(counter, PDH_FMT_DOUBLE, NULL, &val) != ERROR_SUCCESS) return 0;
+
+    *value = val.doubleValue;
+    return 1;
 }
 
 int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint32_t* out_bytes) {
+    PMIB_IFTABLE table = NULL;
+    DWORD size = 0;
+    DWORD i;
+    int found = 0;
+
     if (!interface_name || !in_bytes || !out_bytes) return 0;
-    *in_bytes = 0;
-    *out_bytes = 0;
-    return 0;
+
+    if (GetIfTable(NULL, &size, FALSE) != ERROR_INSUFFICIENT_BUFFER) return 0;
+    table = (PMIB_IFTABLE)malloc(size);
+    if (!table) return 0;
+    if (GetIfTable(table, &size, FALSE) != NO_ERROR) { free(table); return 0; }
+
+    for (i = 0; i < table->dwNumEntries; i++) {
+        MIB_IFROW *row = &table->table[i];
+        if (row->dwType == IF_TYPE_SOFTWARE_LOOPBACK) continue;
+        if (row->dwOperStatus != IF_OPER_STATUS_OPERATIONAL &&
+            row->dwOperStatus != IF_OPER_STATUS_CONNECTED) continue;
+
+        if (strcmp(interface_name, "any") == 0 ||
+            strstr((const char*)row->bDescr, interface_name) != NULL) {
+            *in_bytes = row->dwInOctets;
+            *out_bytes = row->dwOutOctets;
+            found = 1;
+            break;
+        }
+    }
+
+    free(table);
+    return found;
 }
 
 void os_sleep(uint32_t milliseconds) {

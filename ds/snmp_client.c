@@ -306,14 +306,23 @@ int snmp_get_counter32(const char *host, const char *community,
     int resp_len;
     struct hostent *he;
     uint32_t req_id;
+#ifdef _WIN32
+    DWORD tv_ms;
+#else
     struct timeval tv;
+#endif
 
     sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) return 0;
 
+#ifdef _WIN32
+    tv_ms = 5000;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv_ms, sizeof(tv_ms));
+#else
     tv.tv_sec = 5;
     tv.tv_usec = 0;
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+#endif
 
     he = gethostbyname(host);
     if (!he) {

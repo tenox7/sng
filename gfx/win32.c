@@ -9,6 +9,7 @@
 typedef struct {
     HWND hwnd;
     int fullscreen;
+    RECT saved_rect;
 } win32_window_t;
 
 typedef struct {
@@ -189,8 +190,10 @@ void window_set_fullscreen(window_t *window, int fullscreen) {
     if (!window) return;
 
     win = (win32_window_t*)window;
+    if (win->fullscreen == fullscreen) return;
 
     if (fullscreen) {
+        GetWindowRect(win->hwnd, &win->saved_rect);
         style = WS_POPUP | WS_VISIBLE;
         SetWindowLong(win->hwnd, GWL_STYLE, style);
         SetWindowPos(win->hwnd, HWND_TOP, 0, 0,
@@ -200,7 +203,10 @@ void window_set_fullscreen(window_t *window, int fullscreen) {
     } else {
         style = WS_OVERLAPPEDWINDOW | WS_VISIBLE;
         SetWindowLong(win->hwnd, GWL_STYLE, style);
-        SetWindowPos(win->hwnd, HWND_TOP, 100, 100, 800, 600,
+        SetWindowPos(win->hwnd, HWND_TOP,
+                     win->saved_rect.left, win->saved_rect.top,
+                     win->saved_rect.right - win->saved_rect.left,
+                     win->saved_rect.bottom - win->saved_rect.top,
                      SWP_FRAMECHANGED);
     }
 

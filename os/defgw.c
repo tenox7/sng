@@ -326,6 +326,42 @@ static int try_native(char *buf, size_t buflen) {
 }
 
 /* -------------------------------------------------------------------- */
+#elif defined(_WIN32)
+
+#include <winsock2.h>
+#include <iphlpapi.h>
+
+static int try_native(char *buf, size_t buflen) {
+    PMIB_IPFORWARDTABLE table = NULL;
+    DWORD size = 0;
+    DWORD i;
+    int found = 0;
+
+    if (GetIpForwardTable(NULL, &size, FALSE) != ERROR_INSUFFICIENT_BUFFER) return 0;
+    table = (PMIB_IPFORWARDTABLE)malloc(size);
+    if (!table) return 0;
+    if (GetIpForwardTable(table, &size, FALSE) != NO_ERROR) { free(table); return 0; }
+
+    for (i = 0; i < table->dwNumEntries; i++) {
+        if (table->table[i].dwForwardDest == 0 && table->table[i].dwForwardMask == 0) {
+            DWORD nh = table->table[i].dwForwardNextHop;
+            unsigned int b0 = (unsigned int)((nh >>  0) & 0xff);
+            unsigned int b1 = (unsigned int)((nh >>  8) & 0xff);
+            unsigned int b2 = (unsigned int)((nh >> 16) & 0xff);
+            unsigned int b3 = (unsigned int)((nh >> 24) & 0xff);
+            if (nh != 0) {
+                snprintf(buf, buflen, "%u.%u.%u.%u", b0, b1, b2, b3);
+                found = 1;
+                break;
+            }
+        }
+    }
+
+    free(table);
+    return found;
+}
+
+/* -------------------------------------------------------------------- */
 #else
 
 /* AIX, UnixWare, and anything else unknown: no native path. */

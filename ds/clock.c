@@ -204,16 +204,16 @@ static double clock_get_max_scale(void *context) {
 }
 
 datasource_handler_t clock_handler = {
-    .init = clock_init,
-    .collect = clock_collect,
-    .collect_dual = clock_collect_dual,
-    .get_stats = clock_get_stats,
-    .format_value = clock_format_value,
-    .format_dual_stats = clock_format_dual_stats,
-    .get_max_scale = clock_get_max_scale,
-    .cleanup = clock_cleanup,
-    .name = "clock",
-    .unit = "",
-    .is_dual = 1,
-    .max_scale = 24.0
+    clock_init,
+    clock_collect,
+    clock_collect_dual,
+    clock_get_stats,
+    clock_format_value,
+    clock_format_dual_stats,
+    clock_get_max_scale,
+    clock_cleanup,
+    "clock",
+    "",
+    1,
+    24.0
 };

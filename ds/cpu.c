@@ -117,15 +117,16 @@ static void cpu_format_dual_stats(double total, double system, char *buffer, siz
 }
 
 datasource_handler_t cpu_handler = {
-    .init = cpu_init,
-    .collect = cpu_collect,
-    .collect_dual = cpu_collect_dual,
-    .get_stats = cpu_get_stats,
-    .format_value = cpu_format_value,
-    .format_dual_stats = cpu_format_dual_stats,
-    .cleanup = cpu_cleanup,
-    .name = "cpu",
-    .unit = "%",
-    .is_dual = 1,
-    .max_scale = 100.0
+    cpu_init,
+    cpu_collect,
+    cpu_collect_dual,
+    cpu_get_stats,
+    cpu_format_value,
+    cpu_format_dual_stats,
+    NULL,
+    cpu_cleanup,
+    "cpu",
+    "%",
+    1,
+    100.0
 };

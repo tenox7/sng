@@ -16,6 +16,12 @@
 
 static config_t *global_config = NULL;
 
+static color_t mk_color(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+    color_t c;
+    c.r = r; c.g = g; c.b = b; c.a = a;
+    return c;
+}
+
 static char *create_default_config_file(const char *path) {
     static char config_path[512];
     FILE *f;
@@ -35,7 +41,7 @@ static color_t parse_color(const char *str) {
     color_t color;
     unsigned int r, g, b;
 
-    color = (color_t){0, 0, 0, 255};
+    color = mk_color(0, 0, 0, 255);
     if (!str || strlen(str) != 6) return color;
     if (sscanf(str, "%2x%2x%2x", &r, &g, &b) == 3) {
         color.r = (uint8_t)r;
@@ -51,7 +57,7 @@ static int parse_type_target(const char *type, const char *target, plot_config_t
     char auto_name[256];
     char type_upper[64];
     int i;
-    char host[128], community[64], interface[32];
+    char host[128], community[64], iface[32];
     char *pipe_pos;
     size_t len;
     char truncated_target[256];
@@ -86,8 +92,8 @@ static int parse_type_target(const char *type, const char *target, plot_config_t
     type_upper[strlen(type)] = '\0';
 
     if (strcmp(actual_type, "snmp") == 0) {
-        if (sscanf(actual_target, "%127[^,],%63[^,],%31s", host, community, interface) == 3) {
-            snprintf(auto_name, sizeof(auto_name), "BW - %s:%s", host, interface);
+        if (sscanf(actual_target, "%127[^,],%63[^,],%31s", host, community, iface) == 3) {
+            snprintf(auto_name, sizeof(auto_name), "BW - %s:%s", host, iface);
         } else {
             snprintf(auto_name, sizeof(auto_name), "BW - %s", actual_target);
         }
@@ -127,7 +133,7 @@ static int parse_type_target(const char *type, const char *target, plot_config_t
     plot->line_color = config->line_color;
     plot->line_color_secondary = config->line_color_secondary;
 
-    plot->background_color = (color_t){100, 100, 100, 255};
+    plot->background_color = mk_color(100, 100, 100, 255);
     plot->height = 100;
     plot->refresh_interval_ms = 0;
 
@@ -225,12 +231,12 @@ config_t *config_load(const char *filename) {
         return NULL;
     }
     
-    config->background_color = (color_t){100, 100, 100, 255};
-    config->text_color = (color_t){255, 255, 255, 255};
-    config->border_color = (color_t){255, 255, 255, 255};
-    config->line_color = (color_t){0, 255, 0, 255};
-    config->line_color_secondary = (color_t){0, 0, 255, 255};
-    config->error_line_color = (color_t){255, 0, 0, 255};
+    config->background_color = mk_color(100, 100, 100, 255);
+    config->text_color = mk_color(255, 255, 255, 255);
+    config->border_color = mk_color(255, 255, 255, 255);
+    config->line_color = mk_color(0, 255, 0, 255);
+    config->line_color_secondary = mk_color(0, 0, 255, 255);
+    config->error_line_color = mk_color(255, 0, 0, 255);
     config->default_height = 80;
     config->default_width = 300;
     config->refresh_interval_ms = 10000;

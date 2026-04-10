@@ -8,6 +8,15 @@
 #define _SGI_REENTRANT_FUNCTIONS 1
 #endif
 
+#if defined(_WIN32) && defined(_MSC_VER) && _MSC_VER < 1900
+#include <stdio.h>
+#define snprintf _snprintf
+#endif
+
+#if defined(_WIN32) && !defined(_CRT_SECURE_NO_WARNINGS)
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 /* C89 compatibility definitions */
 
 /* Include system headers first to get their definitions */

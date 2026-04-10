@@ -203,15 +203,16 @@ static void ping_format_dual_stats(double latency, double jitter, char *buffer, 
 }
 
 datasource_handler_t ping_handler = {
-    .init = ping_init,
-    .collect = ping_collect,
-    .collect_dual = ping_collect_dual,
-    .get_stats = ping_get_stats,
-    .format_value = ping_format_value,
-    .format_dual_stats = ping_format_dual_stats,
-    .cleanup = ping_cleanup,
-    .name = "ping",
-    .unit = "ms",
-    .is_dual = 1,
-    .max_scale = 0.0
+    ping_init,
+    ping_collect,
+    ping_collect_dual,
+    ping_get_stats,
+    ping_format_value,
+    ping_format_dual_stats,
+    NULL,
+    ping_cleanup,
+    "ping",
+    "ms",
+    1,
+    0.0
 };

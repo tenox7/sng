@@ -83,14 +83,16 @@ static void memory_format_value(double value, char *buffer, size_t buffer_size) 
 }
 
 datasource_handler_t memory_handler = {
-    .init = memory_init,
-    .collect = memory_collect,
-    .collect_dual = NULL,
-    .get_stats = memory_get_stats,
-    .format_value = memory_format_value,
-    .cleanup = memory_cleanup,
-    .name = "memory",
-    .unit = "%",
-    .is_dual = 0,
-    .max_scale = 100.0
+    memory_init,
+    memory_collect,
+    NULL,
+    memory_get_stats,
+    memory_format_value,
+    NULL,
+    NULL,
+    memory_cleanup,
+    "memory",
+    "%",
+    0,
+    100.0
 };

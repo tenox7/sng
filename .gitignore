@@ -1,6 +1,7 @@
 sng
 sng-*
 *.o
+*.obj
 *.ini
 .env
 *.dmg

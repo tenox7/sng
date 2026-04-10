@@ -241,15 +241,16 @@ static void if_thr_format_dual_stats(double in_value, double out_value, char *bu
 }
 
 datasource_handler_t if_thr_handler = {
-    .init = if_thr_init,
-    .collect = if_thr_collect,
-    .collect_dual = if_thr_collect_dual,
-    .get_stats = if_thr_get_stats,
-    .format_value = if_thr_format_value,
-    .format_dual_stats = if_thr_format_dual_stats,
-    .cleanup = if_thr_cleanup,
-    .name = "if_thr",
-    .unit = "B/s",
-    .is_dual = 1,
-    .max_scale = 0.0
+    if_thr_init,
+    if_thr_collect,
+    if_thr_collect_dual,
+    if_thr_get_stats,
+    if_thr_format_value,
+    if_thr_format_dual_stats,
+    NULL,
+    if_thr_cleanup,
+    "if_thr",
+    "B/s",
+    1,
+    0.0
 };

@@ -1,6 +1,7 @@
 #include "os_interface.h"
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
-#include <winsock.h>
 #include <ipexport.h>
 #include <icmpapi.h>
 #include <stdio.h>
@@ -21,10 +22,13 @@ const char* os_get_platform_name(void) {
 }
 
 int os_init(void) {
+    WSADATA wsa;
+    WSAStartup(MAKEWORD(2, 2), &wsa);
     return 1;
 }
 
 void os_cleanup(void) {
+    WSACleanup();
 }
 
 int os_cpu_get_stats(double *value) {

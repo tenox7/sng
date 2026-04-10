@@ -1,5 +1,12 @@
 #include "snmp_client.h"
 #include <string.h>
+#include <time.h>
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define close closesocket
+typedef int socklen_t;
+#else
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/socket.h>
@@ -7,7 +14,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
-#include <time.h>
+#endif
 
 #define ASN_SEQUENCE 0x30
 #define ASN_INTEGER 0x02

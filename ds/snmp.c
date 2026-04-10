@@ -250,15 +250,16 @@ static void snmp_format_dual_stats(double in_value, double out_value, char *buff
 }
 
 datasource_handler_t snmp_handler = {
-    .init = snmp_init,
-    .collect = snmp_collect,
-    .collect_dual = snmp_collect_dual,
-    .get_stats = snmp_get_stats,
-    .format_value = snmp_format_value,
-    .format_dual_stats = snmp_format_dual_stats,
-    .cleanup = snmp_cleanup,
-    .name = "snmp",
-    .unit = "B/s",
-    .is_dual = 1,
-    .max_scale = 0.0
+    snmp_init,
+    snmp_collect,
+    snmp_collect_dual,
+    snmp_get_stats,
+    snmp_format_value,
+    snmp_format_dual_stats,
+    NULL,
+    snmp_cleanup,
+    "snmp",
+    "B/s",
+    1,
+    0.0
 };

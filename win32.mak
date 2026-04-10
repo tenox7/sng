@@ -1,7 +1,7 @@
 CC=cl
-CFLAGS=/DGFX_WIN32 /D_WIN32 /DNO_SHELL /I. /W3 /nologo
+CFLAGS=/DGFX_WIN32 /D_WIN32 /DNO_SHELL /D_CRT_SECURE_NO_WARNINGS /I. /W3 /nologo
 LDFLAGS=/nologo
-LIBS=user32.lib gdi32.lib kernel32.lib wsock32.lib icmp.lib
+LIBS=user32.lib gdi32.lib kernel32.lib ws2_32.lib iphlpapi.lib
 
 OBJS=main.obj graphics.obj config.obj plot.obj ringbuf.obj threading.obj \
      ini_parser.obj datasource.obj clock.obj snmp_client.obj ping.obj \

@@ -22,6 +22,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#define popen _popen
+#define pclose _pclose
+#endif
+
 static int try_netstat(char *buf, size_t buflen);
 
 /* -------------------------------------------------------------------- */

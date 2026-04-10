@@ -8,7 +8,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#ifdef _WIN32
+#include <winsock2.h>
+#else
 #include <unistd.h>
+#endif
 
 typedef struct {
     double min_value;
@@ -416,9 +420,11 @@ plot_system_t *plot_system_create(config_t *config) {
         system->font = font_create("", font_size);
     }
 #else
-    int32_t font_size = (int32_t)(11.0f * config->font_size);
-    if (font_size < 1) font_size = 1;
-    system->font = font_create("", font_size);
+    {
+        int32_t font_size = (int32_t)(11.0f * config->font_size);
+        if (font_size < 1) font_size = 1;
+        system->font = font_create("", font_size);
+    }
 #endif
     if (!system->font) {
         renderer_destroy(system->renderer);

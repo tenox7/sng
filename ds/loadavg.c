@@ -83,14 +83,16 @@ static void loadavg_format_value(double value, char *buffer, size_t buffer_size)
 }
 
 datasource_handler_t loadavg_handler = {
-    .init = loadavg_init,
-    .collect = loadavg_collect,
-    .collect_dual = NULL,
-    .get_stats = loadavg_get_stats,
-    .format_value = loadavg_format_value,
-    .cleanup = loadavg_cleanup,
-    .name = "loadavg",
-    .unit = "",
-    .is_dual = 0,
-    .max_scale = 0.0
+    loadavg_init,
+    loadavg_collect,
+    NULL,
+    loadavg_get_stats,
+    loadavg_format_value,
+    NULL,
+    NULL,
+    loadavg_cleanup,
+    "loadavg",
+    "",
+    0,
+    0.0
 };

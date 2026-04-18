@@ -407,35 +407,3 @@ char *os_get_config_path(const char *filename) {
 }
 
 #include "unix-ping.c"
-
-struct os_ping_context_t {
-    sryze_ping_context_t *sryze_ctx;
-};
-
-os_ping_context_t *os_ping_create(const char *hostname, uint32_t timeout_ms) {
-    os_ping_context_t *ctx;
-
-    ctx = malloc(sizeof(os_ping_context_t));
-    if (!ctx) return NULL;
-
-    ctx->sryze_ctx = sryze_ping_create(hostname, timeout_ms);
-    if (!ctx->sryze_ctx) {
-        free(ctx);
-        return NULL;
-    }
-
-    return ctx;
-}
-
-int os_ping_send(os_ping_context_t *ctx, double *ping_time_ms) {
-    if (!ctx) return 0;
-    return sryze_ping_send(ctx->sryze_ctx, ping_time_ms);
-}
-
-void os_ping_destroy(os_ping_context_t *ctx) {
-    if (!ctx) return;
-    if (ctx->sryze_ctx) {
-        sryze_ping_destroy(ctx->sryze_ctx);
-    }
-    free(ctx);
-}

@@ -1,6 +1,12 @@
+/*
+ * Legacy Unix IPv4 ICMP echo ping.
+ *
+ * Uses SOCK_RAW + IPPROTO_ICMP (requires root) and gethostbyname for
+ * portability to AIX, HP-UX, IRIX, Tru64, SunOS, and UnixWare. Modern
+ * OSes (Darwin, Linux, FreeBSD) use icmp_ping.c instead.
+ */
 
-#include "../compat.h"
-#include "sryze-ping.h"
+#include "os_interface.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,9 +30,9 @@ typedef int socklen_t;
 #define INET_ADDRSTRLEN 16
 #endif
 
-struct icmp {
-    uint8_t icmp_type;
-    uint8_t icmp_code;
+struct icmp_echo_hdr {
+    uint8_t  icmp_type;
+    uint8_t  icmp_code;
     uint16_t icmp_cksum;
     uint16_t icmp_id;
     uint16_t icmp_seq;
@@ -42,17 +48,15 @@ struct icmp {
 #define ICMP_MINLEN 8
 #endif
 
-struct sunos_ping_context {
+struct os_ping_context_t {
     int sockfd;
-    int recvfd;
     struct sockaddr_in target_addr;
     uint16_t id;
     uint16_t seq;
     uint32_t timeout_us;
-    char addr_str[INET_ADDRSTRLEN];
 };
 
-static uint16_t sunos_in_cksum(u_short *addr, int len)
+static uint16_t unix_in_cksum(u_short *addr, int len)
 {
     register int nleft = len;
     register u_short *w = addr;
@@ -79,7 +83,7 @@ static uint16_t sunos_in_cksum(u_short *addr, int len)
     return answer;
 }
 
-static uint64_t sunos_utime(void)
+static uint64_t unix_utime(void)
 {
     struct timeval now;
     return gettimeofday(&now, NULL) != 0
@@ -87,26 +91,25 @@ static uint64_t sunos_utime(void)
         : now.tv_sec * 1000000 + now.tv_usec;
 }
 
-sryze_ping_context_t *sryze_ping_create(const char *hostname, uint32_t timeout_ms)
+os_ping_context_t *os_ping_create(const char *hostname, uint32_t timeout_ms)
 {
-    struct sunos_ping_context *ctx;
+    os_ping_context_t *ctx;
     static uint16_t next_id = 0;
     int bufsize;
     struct hostent *hp;
 
     if (!hostname) return NULL;
 
-    ctx = calloc(1, sizeof(struct sunos_ping_context));
+    ctx = calloc(1, sizeof(*ctx));
     if (!ctx) return NULL;
 
     ctx->timeout_us = timeout_ms * 1000;
     ctx->id = (uint16_t)getpid() + (++next_id);
     ctx->seq = 0;
-    strcpy(ctx->addr_str, "<unknown>");
 
     ctx->target_addr.sin_family = AF_INET;
     ctx->target_addr.sin_addr.s_addr = inet_addr(hostname);
-    if (ctx->target_addr.sin_addr.s_addr == -1 && strcmp(hostname, "255.255.255.255") != 0) {
+    if (ctx->target_addr.sin_addr.s_addr == (in_addr_t)-1 && strcmp(hostname, "255.255.255.255") != 0) {
         hp = gethostbyname(hostname);
         if (hp && hp->h_length == 4) {
             memcpy(&ctx->target_addr.sin_addr, hp->h_addr, hp->h_length);
@@ -116,36 +119,22 @@ sryze_ping_context_t *sryze_ping_create(const char *hostname, uint32_t timeout_m
         }
     }
 
-    ctx->recvfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-    if (ctx->recvfd < 0) {
+    ctx->sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+    if (ctx->sockfd < 0) {
         free(ctx);
         return NULL;
     }
 
-    ctx->sockfd = ctx->recvfd;
-
     bufsize = 48 * 1024;
-    if (bufsize < 64)
-        bufsize = 64;
-    if (setsockopt(ctx->sockfd, SOL_SOCKET, SO_RCVBUF, (char *)&bufsize, sizeof(bufsize)) < 0) {
-    }
-    if (setsockopt(ctx->sockfd, SOL_SOCKET, SO_SNDBUF, (char *)&bufsize, sizeof(bufsize)) < 0) {
-    }
+    setsockopt(ctx->sockfd, SOL_SOCKET, SO_RCVBUF, (char *)&bufsize, sizeof(bufsize));
+    setsockopt(ctx->sockfd, SOL_SOCKET, SO_SNDBUF, (char *)&bufsize, sizeof(bufsize));
 
-#ifdef _AIX
-    strncpy(ctx->addr_str, inet_ntoa(ctx->target_addr.sin_addr), sizeof(ctx->addr_str) - 1);
-    ctx->addr_str[sizeof(ctx->addr_str) - 1] = '\0';
-#else
-    inet_ntop(AF_INET, &ctx->target_addr.sin_addr, ctx->addr_str, sizeof(ctx->addr_str));
-#endif
-
-    return (sryze_ping_context_t *)ctx;
+    return ctx;
 }
 
-int sryze_ping_send(sryze_ping_context_t *ctx_ptr, double *ping_time_ms)
+int os_ping_send(os_ping_context_t *ctx, double *ping_time_ms)
 {
-    struct sunos_ping_context *ctx;
-    struct icmp request;
+    struct icmp_echo_hdr request;
     int error;
     uint64_t start_time;
     uint64_t delay;
@@ -154,21 +143,18 @@ int sryze_ping_send(sryze_ping_context_t *ctx_ptr, double *ping_time_ms)
     int cc;
     struct ip *ip;
     int hlen;
-    struct icmp *icp;
+    struct icmp_echo_hdr *icp;
 
-    if (!ctx_ptr || !ping_time_ms) return 0;
-
-    ctx = (struct sunos_ping_context *)ctx_ptr;
+    if (!ctx || !ping_time_ms) return 0;
 
     request.icmp_type = ICMP_ECHO;
     request.icmp_code = 0;
     request.icmp_cksum = 0;
     request.icmp_id = ctx->id;
     request.icmp_seq = ctx->seq++;
+    request.icmp_cksum = unix_in_cksum((u_short *)&request, sizeof(request));
 
-    request.icmp_cksum = sunos_in_cksum((u_short *)&request, sizeof(request));
-
-    start_time = sunos_utime();
+    start_time = unix_utime();
 
     error = sendto(ctx->sockfd, (char *)&request, sizeof(request), 0,
                    (struct sockaddr *)&ctx->target_addr, sizeof(ctx->target_addr));
@@ -182,10 +168,10 @@ int sryze_ping_send(sryze_ping_context_t *ctx_ptr, double *ping_time_ms)
 
         fromlen = sizeof(from);
 
-        cc = recvfrom(ctx->recvfd, packet, sizeof(packet), 0,
+        cc = recvfrom(ctx->sockfd, packet, sizeof(packet), 0,
                       (struct sockaddr *)&from, &fromlen);
 
-        delay = sunos_utime() - start_time;
+        delay = unix_utime() - start_time;
 
         if (cc < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -211,9 +197,9 @@ int sryze_ping_send(sryze_ping_context_t *ctx_ptr, double *ping_time_ms)
             continue;
         }
 
-        icp = (struct icmp *)(packet + hlen);
+        icp = (struct icmp_echo_hdr *)(packet + hlen);
         if (ip->ip_p == 0) {
-            icp = (struct icmp *)packet;
+            icp = (struct icmp_echo_hdr *)packet;
         }
 
         if (icp->icmp_type == ICMP_ECHOREPLY && icp->icmp_id == ctx->id) {
@@ -223,13 +209,9 @@ int sryze_ping_send(sryze_ping_context_t *ctx_ptr, double *ping_time_ms)
     }
 }
 
-void sryze_ping_destroy(sryze_ping_context_t *ctx_ptr)
+void os_ping_destroy(os_ping_context_t *ctx)
 {
-    struct sunos_ping_context *ctx;
-
-    if (!ctx_ptr) return;
-
-    ctx = (struct sunos_ping_context *)ctx_ptr;
+    if (!ctx) return;
     if (ctx->sockfd >= 0) {
         close(ctx->sockfd);
     }

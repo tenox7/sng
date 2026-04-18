@@ -54,6 +54,7 @@ static int parse_type_target(const char *type, const char *target, plot_config_t
     char *pipe_pos;
     size_t len;
     char truncated_target[256];
+    char defgw_buf[64];
 
     if (!type || !target) return 0;
 
@@ -66,6 +67,15 @@ static int parse_type_target(const char *type, const char *target, plot_config_t
             actual_target = target + 6;
         } else {
             actual_type = "if_thr";
+        }
+    }
+
+    if (strcmp(actual_type, "ping") == 0 && strcmp(actual_target, "_defgw") == 0) {
+        if (os_get_default_gateway(defgw_buf, sizeof(defgw_buf))) {
+            actual_target = defgw_buf;
+        } else {
+            fprintf(stderr, "Could not resolve default gateway for ping=_defgw\n");
+            return 0;
         }
     }
 

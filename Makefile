@@ -74,7 +74,7 @@ ifeq ($(GFX),)
     LDFLAGS += -lX11
 endif
 
-SOURCES = main.c graphics.c config.c plot.c ringbuf.c threading.c ini_parser.c datasource.c ds/snmp_client.c ds/ping.c ds/cpu.c ds/memory.c ds/snmp.c ds/if_thr.c ds/loadavg.c ds/shell.c ds/clock.c os/os.c
+SOURCES = main.c graphics.c config.c plot.c ringbuf.c threading.c ini_parser.c datasource.c ds/snmp_client.c ds/ping.c ds/cpu.c ds/memory.c ds/snmp.c ds/if_thr.c ds/loadavg.c ds/shell.c ds/clock.c os/os.c os/defgw.c
 OBJECTS = $(SOURCES:.c=.o)
 TARGET = sng
 

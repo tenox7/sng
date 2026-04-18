@@ -2,6 +2,7 @@
 #define OS_INTERFACE_H
 
 #include "../compat.h"
+#include <stddef.h>
 
 typedef struct plot_mutex_t plot_mutex_t;
 typedef struct plot_thread_t plot_thread_t;
@@ -52,5 +53,9 @@ typedef struct os_ping_context_t os_ping_context_t;
 os_ping_context_t *os_ping_create(const char *hostname, uint32_t timeout_ms);
 int os_ping_send(os_ping_context_t *ctx, double *ping_time_ms);
 void os_ping_destroy(os_ping_context_t *ctx);
+
+/* Default gateway discovery. Writes dotted-quad IPv4 string into buf.
+ * Returns 1 on success, 0 on failure. */
+int os_get_default_gateway(char *buf, size_t buflen);
 
 #endif /* OS_INTERFACE_H */

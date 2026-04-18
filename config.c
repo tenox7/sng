@@ -182,6 +182,9 @@ config_t *config_load(const char *filename) {
     char *type, *target;
     char *section_name;
     char *platform_config_path;
+#if defined(__APPLE__) && defined(__MACH__)
+    char *bundle_config_path;
+#endif
 
     ini = ini_parse_file(filename);
     config_path = NULL;
@@ -192,6 +195,15 @@ config_t *config_load(const char *filename) {
         if (platform_config_path) {
             ini = ini_parse_file(platform_config_path);
         }
+
+#if defined(__APPLE__) && defined(__MACH__)
+        if (!ini) {
+            bundle_config_path = os_get_bundle_config_path(filename);
+            if (bundle_config_path) {
+                ini = ini_parse_file(bundle_config_path);
+            }
+        }
+#endif
 
         if (!ini) {
             use_defaults = 1;

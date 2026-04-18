@@ -48,6 +48,12 @@ int os_plot_thread_join_timeout(plot_thread_t *thread, uint32_t timeout_ms);
 /* Config path function */
 char *os_get_config_path(const char *filename);
 
+#if defined(__APPLE__) && defined(__MACH__)
+/* Returns path to filename inside the .app bundle's Resources dir, or NULL
+ * if not running from a bundle. Only meaningful on macOS. */
+char *os_get_bundle_config_path(const char *filename);
+#endif
+
 /* Ping functions */
 typedef struct os_ping_context_t os_ping_context_t;
 os_ping_context_t *os_ping_create(const char *hostname, uint32_t timeout_ms);

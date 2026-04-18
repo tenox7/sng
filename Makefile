@@ -99,31 +99,52 @@ BUNDLE_CONTENTS = $(BUNDLE_DIR)/Contents
 BUNDLE_MACOS = $(BUNDLE_CONTENTS)/MacOS
 BUNDLE_RESOURCES = $(BUNDLE_CONTENTS)/Resources
 
+define INFO_PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleExecutable</key>
+	<string>$(APP_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.example.sng</string>
+	<key>CFBundleName</key>
+	<string>$(APP_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleVersion</key>
+	<string>1.0</string>
+	<key>CFBundleIconFile</key>
+	<string>$(APP_NAME)</string>
+</dict>
+</plist>
+endef
+export INFO_PLIST
+
 # Create macOS .app bundle
 app: $(TARGET)
 	mkdir -p $(BUNDLE_MACOS)
 	mkdir -p $(BUNDLE_RESOURCES)
 	cp $(TARGET) $(BUNDLE_MACOS)/$(APP_NAME)
-	echo '<?xml version="1.0" encoding="UTF-8"?>' > $(BUNDLE_CONTENTS)/Info.plist
-	echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> $(BUNDLE_CONTENTS)/Info.plist
-	echo '<plist version="1.0">' >> $(BUNDLE_CONTENTS)/Info.plist
-	echo '<dict>' >> $(BUNDLE_CONTENTS)/Info.plist
-	echo '	<key>CFBundleExecutable</key>' >> $(BUNDLE_CONTENTS)/Info.plist
-	echo '	<string>$(APP_NAME)</string>' >> $(BUNDLE_CONTENTS)/Info.plist
-	echo '	<key>CFBundleIdentifier</key>' >> $(BUNDLE_CONTENTS)/Info.plist
-	echo '	<string>com.example.sng</string>' >> $(BUNDLE_CONTENTS)/Info.plist
-	echo '	<key>CFBundleName</key>' >> $(BUNDLE_CONTENTS)/Info.plist
-	echo '	<string>$(APP_NAME)</string>' >> $(BUNDLE_CONTENTS)/Info.plist
-	echo '	<key>CFBundlePackageType</key>' >> $(BUNDLE_CONTENTS)/Info.plist
-	echo '	<string>APPL</string>' >> $(BUNDLE_CONTENTS)/Info.plist
-	echo '	<key>CFBundleVersion</key>' >> $(BUNDLE_CONTENTS)/Info.plist
-	echo '	<string>1.0</string>' >> $(BUNDLE_CONTENTS)/Info.plist
-	echo '</dict>' >> $(BUNDLE_CONTENTS)/Info.plist
-	echo '</plist>' >> $(BUNDLE_CONTENTS)/Info.plist
+	sed -n -e 's/^"//' -e 's/\\n";*$$//p' default_config.h > $(BUNDLE_RESOURCES)/sng.ini
+	cp macos/$(APP_NAME).icns $(BUNDLE_RESOURCES)/$(APP_NAME).icns
+	echo "$$INFO_PLIST" > $(BUNDLE_CONTENTS)/Info.plist
+
+# Regenerate the .icns icon from macos/make_icon.swift (requires swift + iconutil)
+icon:
+	cd macos && swift make_icon.swift icon_1024.png
+	rm -rf macos/$(APP_NAME).iconset && mkdir macos/$(APP_NAME).iconset
+	for s in 16 32 128 256 512; do \
+		sips -z $$s $$s macos/icon_1024.png --out macos/$(APP_NAME).iconset/icon_$${s}x$${s}.png >/dev/null; \
+		s2=$$((s*2)); \
+		sips -z $$s2 $$s2 macos/icon_1024.png --out macos/$(APP_NAME).iconset/icon_$${s}x$${s}@2x.png >/dev/null; \
+	done
+	iconutil -c icns macos/$(APP_NAME).iconset -o macos/$(APP_NAME).icns
+	rm -rf macos/$(APP_NAME).iconset macos/icon_1024.png
 
 # Create .dmg from .app bundle
 dmg: app
 	rm -f $(APP_NAME).dmg
 	hdiutil create -srcfolder $(BUNDLE_DIR) -volname "$(APP_NAME)" -format UDZO sng-macos.dmg
 
-.PHONY: all clean install app dmg
+.PHONY: all clean install app dmg icon

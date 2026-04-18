@@ -144,6 +144,18 @@ You will also need to make it suid, setcap, or sysctl ping group.
 
 Also you should switch from Wayland to Xorg in `raspi-config`.
 
+## Building
+
+```
+make GFX=<X11|SDL2|SDL3|GTK|GLFW>
+```
+
+### macOS / Darwin
+
+```
+brew install pkgconf sdl3 sdl3_ttf fontconfig
+```
+
 ## Development libraries
 
 ### SDL2

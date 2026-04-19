@@ -96,7 +96,8 @@ You can also specify the location with `-f /full/path/to/sng.ini`
 - `font_name` - font family name
 
 **[targets]**
-- `ping=<host>` - ICMP echo (e.g., `ping=1.1.1.1`). Use `ping=_defgw` to auto-resolve and ping the system default gateway; the display shows the resolved IP.
+- `ping=<host>` - ICMP echo (e.g., `ping=1.1.1.1`). 
+- `ping=_defgw` - ICMP echo to host's default gateway IP address
 - `bw=local,<interface>` - local interface throughput (e.g., `bw=local,eth0`)
 - `bw=snmp1,<host>,<community>,<ifidx>` - SNMP bandwidth (e.g., `bw=snmp1,192.168.1.1,public,7`)
 - `cpu=local` - CPU usage percentage

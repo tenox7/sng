@@ -88,6 +88,8 @@ $(TARGET): $(OBJECTS)
 
 clean:
 	rm -f *.o */*.o $(TARGET)
+	rm -rf $(BUNDLE_DIR) $(APP_NAME).dmg sng-macos.dmg
+	rm -rf macos/$(APP_NAME).iconset macos/icon_1024.png
 
 install: $(TARGET)
 	cp $(TARGET) /usr/local/bin/

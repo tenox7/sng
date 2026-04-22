@@ -5,9 +5,9 @@
  * the box, and on Linux when net.ipv4.ping_group_range covers the caller's
  * gid). Falls back to SOCK_RAW + IPPROTO_ICMP if SOCK_DGRAM is not permitted.
  *
- * Reply matching uses the sequence number. Under SOCK_DGRAM the kernel
- * rewrites the ICMP id on send and demuxes replies to the originating socket,
- * so matching on id is unreliable across platforms.
+ * Reply matching uses the source address and sequence number. Under SOCK_DGRAM
+ * the kernel rewrites the ICMP id on send and demuxes replies to the originating
+ * socket, so matching on id is unreliable across platforms.
  */
 
 #include "os_interface.h"
@@ -142,6 +142,8 @@ int os_ping_send(os_ping_context_t *ctx, double *ping_time_ms) {
             *ping_time_ms = -1.0;
             return 0;
         }
+
+        if (from.sin_addr.s_addr != ctx->dst.sin_addr.s_addr) continue;
 
         /* SOCK_RAW delivers IP+ICMP; SOCK_DGRAM usually delivers ICMP only.
          * Detect an IPv4 header by its version nibble and skip it. */

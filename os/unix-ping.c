@@ -137,13 +137,18 @@ int os_ping_send(os_ping_context_t *ctx, double *ping_time_ms)
     struct icmp_echo_hdr request;
     int error;
     uint64_t start_time;
-    uint64_t delay;
+    uint64_t elapsed_us;
+    uint64_t remaining_us;
     struct sockaddr_in from;
     socklen_t fromlen;
     int cc;
     struct ip *ip;
     int hlen;
     struct icmp_echo_hdr *icp;
+    fd_set rfds;
+    struct timeval tv;
+    int r;
+    char packet[1024];
 
     if (!ctx || !ping_time_ms) return 0;
 
@@ -164,28 +169,34 @@ int os_ping_send(os_ping_context_t *ctx, double *ping_time_ms)
     }
 
     for (;;) {
-        char packet[1024];
+        elapsed_us = unix_utime() - start_time;
+        if (elapsed_us >= ctx->timeout_us) {
+            *ping_time_ms = -1.0;
+            return 0;
+        }
+        remaining_us = ctx->timeout_us - elapsed_us;
+        tv.tv_sec = (long)(remaining_us / 1000000);
+        tv.tv_usec = (long)(remaining_us % 1000000);
+
+        FD_ZERO(&rfds);
+        FD_SET(ctx->sockfd, &rfds);
+        r = select(ctx->sockfd + 1, &rfds, NULL, NULL, &tv);
+        if (r < 0 && errno == EINTR) continue;
+        if (r <= 0) {
+            *ping_time_ms = -1.0;
+            return 0;
+        }
 
         fromlen = sizeof(from);
-
         cc = recvfrom(ctx->sockfd, packet, sizeof(packet), 0,
                       (struct sockaddr *)&from, &fromlen);
-
-        delay = unix_utime() - start_time;
-
         if (cc < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                if (delay > ctx->timeout_us) {
-                    *ping_time_ms = -1.0;
-                    return 0;
-                } else {
-                    continue;
-                }
-            } else {
-                *ping_time_ms = -1.0;
-                return 0;
-            }
+            if (errno == EINTR) continue;
+            *ping_time_ms = -1.0;
+            return 0;
         }
+
+        if (from.sin_addr.s_addr != ctx->target_addr.sin_addr.s_addr) continue;
 
         ip = (struct ip *)packet;
 #if defined(__osf__) || defined(__digital__)
@@ -193,9 +204,7 @@ int os_ping_send(os_ping_context_t *ctx, double *ping_time_ms)
 #else
         hlen = ip->ip_hl << 2;
 #endif
-        if (cc < hlen + ICMP_MINLEN) {
-            continue;
-        }
+        if (cc < hlen + ICMP_MINLEN) continue;
 
         icp = (struct icmp_echo_hdr *)(packet + hlen);
         if (ip->ip_p == 0) {
@@ -203,7 +212,7 @@ int os_ping_send(os_ping_context_t *ctx, double *ping_time_ms)
         }
 
         if (icp->icmp_type == ICMP_ECHOREPLY && icp->icmp_id == ctx->id) {
-            *ping_time_ms = (double)delay / 1000.0;
+            *ping_time_ms = (double)(unix_utime() - start_time) / 1000.0;
             return 1;
         }
     }

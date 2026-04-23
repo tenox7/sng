@@ -5,7 +5,7 @@ LDFLAGS =
 # Platform detection
 UNAME_S ?= $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
-    LDFLAGS += -framework CoreFoundation -framework IOKit
+    LDFLAGS += -framework IOKit
 endif
 ifeq ($(UNAME_S),Linux)
     CFLAGS += -DLINUX
@@ -128,7 +128,6 @@ app: $(TARGET)
 	mkdir -p $(BUNDLE_MACOS)
 	mkdir -p $(BUNDLE_RESOURCES)
 	cp $(TARGET) $(BUNDLE_MACOS)/$(APP_NAME)
-	sed -n -e 's/^"//' -e 's/\\n";*$$//p' default_config.h > $(BUNDLE_RESOURCES)/sng.ini
 	cp macos/$(APP_NAME).icns $(BUNDLE_RESOURCES)/$(APP_NAME).icns
 	echo "$$INFO_PLIST" > $(BUNDLE_CONTENTS)/Info.plist
 

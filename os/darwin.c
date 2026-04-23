@@ -16,7 +16,6 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include <stdio.h>
-#include <CoreFoundation/CoreFoundation.h>
 
 #include "icmp_ping.c"
 
@@ -356,31 +355,5 @@ char *os_get_config_path(const char *filename) {
     snprintf(config_path, sizeof(config_path), "%s/Library/Preferences/%s", home, filename);
 
     return config_path;
-}
-
-char *os_get_bundle_config_path(const char *filename) {
-    static char result[1024];
-    CFBundleRef bundle;
-    CFURLRef bundle_url;
-    char bundle_path[768];
-    size_t len;
-    Boolean ok;
-
-    bundle = CFBundleGetMainBundle();
-    if (!bundle) return NULL;
-
-    bundle_url = CFBundleCopyBundleURL(bundle);
-    if (!bundle_url) return NULL;
-
-    ok = CFURLGetFileSystemRepresentation(bundle_url, true,
-                                          (UInt8 *)bundle_path, sizeof(bundle_path));
-    CFRelease(bundle_url);
-    if (!ok) return NULL;
-
-    len = strlen(bundle_path);
-    if (len < 4 || strcmp(bundle_path + len - 4, ".app") != 0) return NULL;
-
-    snprintf(result, sizeof(result), "%s/Contents/Resources/%s", bundle_path, filename);
-    return result;
 }
 

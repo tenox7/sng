@@ -16,11 +16,12 @@
 
 static config_t *global_config = NULL;
 
-static char *create_default_config_file(const char *filename) {
-    static char config_path[256];
+static char *create_default_config_file(const char *path) {
+    static char config_path[512];
     FILE *f;
 
-    strcpy(config_path, filename);
+    strncpy(config_path, path, sizeof(config_path) - 1);
+    config_path[sizeof(config_path) - 1] = '\0';
     f = fopen(config_path, "w");
     if (!f) return NULL;
 
@@ -182,29 +183,17 @@ config_t *config_load(const char *filename) {
     char *type, *target;
     char *section_name;
     char *platform_config_path;
-#if defined(__APPLE__) && defined(__MACH__)
-    char *bundle_config_path;
-#endif
+    const char *create_path;
 
     ini = ini_parse_file(filename);
     config_path = NULL;
     use_defaults = 0;
+    platform_config_path = os_get_config_path(filename);
 
     if (!ini) {
-        platform_config_path = os_get_config_path(filename);
         if (platform_config_path) {
             ini = ini_parse_file(platform_config_path);
         }
-
-#if defined(__APPLE__) && defined(__MACH__)
-        if (!ini) {
-            bundle_config_path = os_get_bundle_config_path(filename);
-            if (bundle_config_path) {
-                ini = ini_parse_file(bundle_config_path);
-            }
-        }
-#endif
-
         if (!ini) {
             use_defaults = 1;
         }
@@ -217,14 +206,15 @@ config_t *config_load(const char *filename) {
     }
 
     if (use_defaults) {
-        config_path = create_default_config_file(filename);
+        create_path = platform_config_path ? platform_config_path : filename;
+        config_path = create_default_config_file(create_path);
         if (!config_path) {
-            fprintf(stderr, "Could not create config file %s\n", filename);
+            fprintf(stderr, "Could not create config file %s\n", create_path);
             return NULL;
         }
         ini = ini_parse_file(config_path);
         if (!ini) {
-            fprintf(stderr, "Could not parse config file %s\n", filename);
+            fprintf(stderr, "Could not parse config file %s\n", config_path);
             return NULL;
         }
     }

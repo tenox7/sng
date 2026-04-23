@@ -28,16 +28,16 @@ Supports multiple graphs with:
 
 - X11
 - GTK
-- SDL
+- SDL 2/3
 - GLFW
 
 ## ICMP / Ping permissions
 
-SNG opens `SOCK_DGRAM + IPPROTO_ICMP` first and falls back to `SOCK_RAW` if the kernel refuses. What you need to do depends on the OS:
+On MacOS / Linux SNG should work without root permissions / setuid.
 
-**macOS** — no setup required, runs rootless out of the box.
+On other systems SNG may require sudo or `+s` / suid on the binary.
 
-**Linux** — rootless works if the caller's gid is inside `net.ipv4.ping_group_range`. Default varies by distro; enable for all users with:
+SNG tries `SOCK_DGRAM + IPPROTO_ICMP` first and falls back to `SOCK_RAW` if the kernel refuses. On Linux rootless works if the caller's gid is inside `net.ipv4.ping_group_range`. Default varies by distro; enable for all users with:
 
 ```
 sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"
@@ -55,7 +55,7 @@ Or grant the binary raw-socket capability:
 sudo setcap cap_net_raw+ep /path/to/sng
 ```
 
-**FreeBSD / OpenBSD / NetBSD / legacy Unix** — SOCK_DGRAM ICMP is not supported; the SOCK_RAW fallback needs root:
+**Other Unix** — SOCK_DGRAM ICMP is not supported; the SOCK_RAW fallback needs root:
 
 ```
 sudo /path/to/sng
@@ -145,7 +145,7 @@ exec /path/to/sng -f /path/to/sng.ini
 
 On Raspbian you will also need to enable rootless ICMP (`sysctl net.ipv4.ping_group_range`) or `setcap cap_net_raw+ep` on the binary — see the ICMP permissions section above.
 
-Also you should switch from Wayland to Xorg in `raspi-config`.
+Also you should switch from Wayland to Xorg in `raspi-config` (faster).
 
 ## Building
 

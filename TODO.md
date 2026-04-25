@@ -16,19 +16,18 @@
 ## Data Sources
 
 - implement more stats, look at: top, xosview, net-snmp, perf meter
-- modern stats like temperature, wifi signal, battery level
+- modern stats like temperature, wifi signal/rssi, battery level
 - interface errors, drops, etc local and snmp
 - ping jitter
 - storage: IOPS, MB/s from iostat
 - snmp v2 getifx
 - IPv6 support
 
-
-
 ## Platforms
 
 - OpenServer/OpenDesktop
 - NextStep/OpenStep
+- OpenVMS
 - Win32/NT
 - Plan9
 - RiscOS

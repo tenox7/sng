@@ -144,8 +144,6 @@ xset s off
 exec /path/to/sng -f /path/to/sng.ini
 ```
 
-On Raspbian you will also need to enable rootless ICMP (`sysctl net.ipv4.ping_group_range`) or `setcap cap_net_raw+ep` on the binary — see the ICMP permissions section above.
-
 Also you should switch from Wayland to Xorg in `raspi-config` (faster).
 
 ## Building

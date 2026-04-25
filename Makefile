@@ -6,6 +6,10 @@ LDFLAGS =
 UNAME_S ?= $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
     LDFLAGS += -framework IOKit
+    ifeq ($(UNIVERSAL),1)
+        CFLAGS += -arch x86_64 -arch arm64
+        LDFLAGS += -arch x86_64 -arch arm64
+    endif
 endif
 ifeq ($(UNAME_S),Linux)
     CFLAGS += -DLINUX
@@ -157,4 +161,9 @@ dmg: app
 	rm -f $(APP_NAME).dmg
 	hdiutil create -srcfolder $(BUNDLE_DIR) -volname "$(APP_NAME)" -format UDZO sng-macos.dmg
 
-.PHONY: all clean install app dmg icon
+# Universal Cocoa-backed .app for macOS (x86_64 + arm64)
+macos:
+	$(MAKE) clean
+	$(MAKE) GFX=COCOA UNIVERSAL=1 app
+
+.PHONY: all clean install app dmg icon macos

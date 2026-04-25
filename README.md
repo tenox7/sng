@@ -151,13 +151,13 @@ Also you should switch from Wayland to Xorg in `raspi-config` (faster).
 ## Building
 
 ```
-make GFX=<X11|SDL2|SDL3|GTK|GLFW>
+make GFX=<X11|SDL2|SDL3|GTK|GLFW|COCOA>
 ```
 
 ### macOS / Darwin
 
 ```
-brew install pkgconf sdl3 sdl3_ttf fontconfig
+make macos
 ```
 
 ## Development libraries

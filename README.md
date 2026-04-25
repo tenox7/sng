@@ -30,6 +30,7 @@ Supports multiple graphs with:
 - GTK
 - SDL 2/3
 - GLFW
+- COCOA
 
 ## ICMP / Ping permissions
 

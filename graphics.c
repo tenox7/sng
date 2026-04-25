@@ -14,6 +14,8 @@
     #include "gfx/x11.c"
 #elif defined(GFX_GLFW)
     #include "gfx/glfw.c"
+#elif defined(GFX_COCOA)
+    /* implemented in gfx/cocoa.m, compiled separately */
 #else
-    #error "No graphics driver selected. Use -DGFX_SDL3, -DGFX_SDL2, -DGFX_GTK3, -DGFX_X11, or -DGFX_GLFW"
+    #error "No graphics driver selected. Use -DGFX_SDL3, -DGFX_SDL2, -DGFX_GTK3, -DGFX_X11, -DGFX_GLFW, or -DGFX_COCOA"
 #endif

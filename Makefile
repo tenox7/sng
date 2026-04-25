@@ -68,6 +68,11 @@ ifeq ($(GFX),GLFW)
         LDFLAGS += $(shell pkg-config --libs glfw3 freetype2) -lGL
     endif
 endif
+ifeq ($(GFX),COCOA)
+    CFLAGS += -DGFX_COCOA
+    LDFLAGS += -framework Cocoa
+    OBJC_SOURCES = gfx/cocoa.m
+endif
 
 ifeq ($(GFX),)
     CFLAGS += -DGFX_X11
@@ -76,14 +81,18 @@ endif
 
 SOURCES = main.c graphics.c config.c plot.c ringbuf.c threading.c ini_parser.c datasource.c ds/snmp_client.c ds/ping.c ds/cpu.c ds/memory.c ds/snmp.c ds/if_thr.c ds/loadavg.c ds/shell.c ds/clock.c os/os.c os/defgw.c
 OBJECTS = $(SOURCES:.c=.o)
+OBJC_OBJECTS = $(OBJC_SOURCES:.m=.o)
 TARGET = sng
 
 all: $(TARGET)
 
-$(TARGET): $(OBJECTS)
-	$(CC) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
+$(TARGET): $(OBJECTS) $(OBJC_OBJECTS)
+	$(CC) $(OBJECTS) $(OBJC_OBJECTS) -o $(TARGET) $(LDFLAGS)
 
 %.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+%.o: %.m
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

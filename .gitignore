@@ -2,3 +2,7 @@ sng
 sng-*
 *.o
 *.ini
+.env
+*.dmg
+SNG.app
+dmg_staging

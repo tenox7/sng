@@ -1,3 +1,5 @@
+-include .env
+
 CC = gcc
 CFLAGS = -g
 LDFLAGS =
@@ -101,7 +103,7 @@ $(TARGET): $(OBJECTS) $(OBJC_OBJECTS)
 
 clean:
 	rm -f *.o */*.o $(TARGET)
-	rm -rf $(BUNDLE_DIR) $(APP_NAME).dmg sng-macos.dmg
+	rm -rf $(BUNDLE_DIR) $(APP_NAME).dmg sng-macos.dmg dmg_staging
 	rm -rf macos/$(APP_NAME).iconset macos/icon_1024.png
 
 install: $(TARGET)
@@ -113,6 +115,8 @@ BUNDLE_DIR = $(APP_NAME).app
 BUNDLE_CONTENTS = $(BUNDLE_DIR)/Contents
 BUNDLE_MACOS = $(BUNDLE_CONTENTS)/MacOS
 BUNDLE_RESOURCES = $(BUNDLE_CONTENTS)/Resources
+DMG_PATH = sng-macos.dmg
+STAGING = dmg_staging
 
 define INFO_PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -136,13 +140,15 @@ define INFO_PLIST
 endef
 export INFO_PLIST
 
-# Create macOS .app bundle
+# Create macOS .app bundle (ad-hoc signed for local use)
 app: $(TARGET)
+	rm -rf $(BUNDLE_DIR)
 	mkdir -p $(BUNDLE_MACOS)
 	mkdir -p $(BUNDLE_RESOURCES)
 	cp $(TARGET) $(BUNDLE_MACOS)/$(APP_NAME)
 	cp macos/$(APP_NAME).icns $(BUNDLE_RESOURCES)/$(APP_NAME).icns
 	echo "$$INFO_PLIST" > $(BUNDLE_CONTENTS)/Info.plist
+	codesign --force --sign - $(BUNDLE_DIR)
 
 # Regenerate the .icns icon from macos/make_icon.swift (requires swift + iconutil)
 icon:
@@ -156,14 +162,40 @@ icon:
 	iconutil -c icns macos/$(APP_NAME).iconset -o macos/$(APP_NAME).icns
 	rm -rf macos/$(APP_NAME).iconset macos/icon_1024.png
 
+define build_dmg
+	rm -rf $(STAGING) $(1)
+	mkdir -p $(STAGING)
+	cp -R $(BUNDLE_DIR) $(STAGING)/
+	ln -s /Applications $(STAGING)/Applications
+	hdiutil create -volname "$(APP_NAME)" -srcfolder $(STAGING) -ov -format UDZO $(1)
+	rm -rf $(STAGING)
+endef
+
 # Create .dmg from .app bundle
 dmg: app
-	rm -f $(APP_NAME).dmg
-	hdiutil create -srcfolder $(BUNDLE_DIR) -volname "$(APP_NAME)" -format UDZO sng-macos.dmg
+	$(call build_dmg,$(DMG_PATH))
 
 # Universal Cocoa-backed .app for macOS (x86_64 + arm64)
 macos:
 	$(MAKE) clean
 	$(MAKE) GFX=COCOA UNIVERSAL=1 app
 
-.PHONY: all clean install app dmg icon macos
+# Signed + notarized release (requires DEV_ID + NOTARY_PROFILE in .env)
+release:
+	@test -n "$(DEV_ID)" || { echo "DEV_ID not set — copy .env.example to .env and fill in"; exit 1; }
+	@test -n "$(NOTARY_PROFILE)" || { echo "NOTARY_PROFILE not set — copy .env.example to .env and fill in"; exit 1; }
+	$(MAKE) clean
+	$(MAKE) GFX=COCOA UNIVERSAL=1 $(TARGET)
+	rm -rf $(BUNDLE_DIR)
+	mkdir -p $(BUNDLE_MACOS) $(BUNDLE_RESOURCES)
+	cp $(TARGET) $(BUNDLE_MACOS)/$(APP_NAME)
+	cp macos/$(APP_NAME).icns $(BUNDLE_RESOURCES)/$(APP_NAME).icns
+	echo "$$INFO_PLIST" > $(BUNDLE_CONTENTS)/Info.plist
+	codesign --force --options runtime --timestamp --sign "$(DEV_ID)" $(BUNDLE_DIR)
+	$(call build_dmg,$(DMG_PATH))
+	codesign --force --timestamp --sign "$(DEV_ID)" $(DMG_PATH)
+	xcrun notarytool submit $(DMG_PATH) --keychain-profile "$(NOTARY_PROFILE)" --wait
+	xcrun stapler staple $(DMG_PATH)
+	@echo "Signed + notarized: $(DMG_PATH)"
+
+.PHONY: all clean install app dmg icon macos release

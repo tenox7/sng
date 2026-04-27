@@ -1,0 +1,58 @@
+name: Release Linux packages
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.format }} ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        format: [appimage, flatpak, snap]
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-22.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        run: make ${{ matrix.format }}-${{ matrix.arch }}
+
+      - name: List output
+        run: ls -la dist/
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/sng-*.AppImage
+            dist/sng-*.flatpak
+            dist/sng_*.snap
+
+      - name: Upload as workflow artifact
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sng-${{ matrix.format }}-${{ matrix.arch }}
+          path: |
+            dist/sng-*.AppImage
+            dist/sng-*.flatpak
+            dist/sng_*.snap
+          if-no-files-found: error
+          retention-days: 14

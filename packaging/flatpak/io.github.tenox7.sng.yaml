@@ -1,0 +1,58 @@
+app-id: io.github.tenox7.sng
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: sng
+
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --filesystem=xdg-config/sng:create
+
+cleanup:
+  - /include
+  - /lib/cmake
+  - /lib/pkgconfig
+  - /share/aclocal
+  - /share/man
+  - '*.la'
+  - '*.a'
+
+modules:
+  - name: sdl3
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSDL_STATIC=OFF
+      - -DSDL_TEST_LIBRARY=OFF
+    sources:
+      - type: git
+        url: https://github.com/libsdl-org/SDL.git
+        tag: release-3.2.10
+        disable-submodules: true
+
+  - name: sdl3-ttf
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSDLTTF_VENDORED=OFF
+    sources:
+      - type: git
+        url: https://github.com/libsdl-org/SDL_ttf.git
+        tag: release-3.2.2
+        disable-submodules: true
+
+  - name: sng
+    buildsystem: simple
+    build-commands:
+      - make GFX=SDL3 NO_SHELL=1
+      - install -Dm755 sng /app/bin/sng
+      - install -Dm644 packaging/shared/sng.png /app/share/icons/hicolor/256x256/apps/io.github.tenox7.sng.png
+      - install -Dm644 packaging/flatpak/io.github.tenox7.sng.desktop /app/share/applications/io.github.tenox7.sng.desktop
+      - install -Dm644 packaging/flatpak/io.github.tenox7.sng.metainfo.xml /app/share/metainfo/io.github.tenox7.sng.metainfo.xml
+    sources:
+      - type: dir
+        path: ../..

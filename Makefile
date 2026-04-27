@@ -85,7 +85,14 @@ ifeq ($(GFX),)
     LDFLAGS += -lX11
 endif
 
-SOURCES = main.c graphics.c config.c plot.c ringbuf.c threading.c ini_parser.c datasource.c ds/snmp_client.c ds/ping.c ds/cpu.c ds/memory.c ds/snmp.c ds/if_thr.c ds/loadavg.c ds/shell.c ds/clock.c os/os.c os/defgw.c
+ifeq ($(NO_SHELL),1)
+    CFLAGS += -DNO_SHELL
+    SHELL_SRC =
+else
+    SHELL_SRC = ds/shell.c
+endif
+
+SOURCES = main.c graphics.c config.c plot.c ringbuf.c threading.c ini_parser.c datasource.c ds/snmp_client.c ds/ping.c ds/cpu.c ds/memory.c ds/snmp.c ds/if_thr.c ds/loadavg.c $(SHELL_SRC) ds/clock.c os/os.c os/defgw.c
 OBJECTS = $(SOURCES:.c=.o)
 OBJC_OBJECTS = $(OBJC_SOURCES:.m=.o)
 TARGET = sng
@@ -198,4 +205,64 @@ release:
 	xcrun stapler staple $(DMG_PATH)
 	@echo "Signed + notarized: $(DMG_PATH)"
 
-.PHONY: all clean install app dmg icon macos release
+DOCKER ?= docker
+APPIMAGE_IMAGE = sng-appimage-builder
+FLATPAK_IMAGE  = sng-flatpak-builder
+SNAP_IMAGE     = sng-snap-builder
+
+# AppImage default = amd64 (broadest reach; QEMU emulation works fine here).
+appimage: appimage-amd64
+appimage-all: appimage-amd64 appimage-arm64
+
+appimage-%:
+	$(DOCKER) build --platform=linux/$* -t $(APPIMAGE_IMAGE)-$* packaging/appimage
+	$(DOCKER) run --rm --platform=linux/$* -v $(CURDIR):/work -w /work $(APPIMAGE_IMAGE)-$* packaging/appimage/build.sh
+
+# Flatpak/Snap default targets build for the host arch — cross-arch via QEMU
+# emulation breaks bwrap (flatpak) and is wasteful for snap. Use *-amd64 /
+# *-arm64 explicitly when you know the host can support it (real Linux x86_64,
+# Apple Silicon for arm64).
+flatpak:
+	$(DOCKER) build -t $(FLATPAK_IMAGE) packaging/flatpak
+	$(DOCKER) run --rm --privileged \
+		--security-opt seccomp=unconfined \
+		--security-opt apparmor=unconfined \
+		-v $(CURDIR):/work -w /work \
+		-v sng-flatpak-cache:/root/.local/share/flatpak \
+		$(FLATPAK_IMAGE) packaging/flatpak/build.sh
+
+flatpak-all: flatpak-amd64 flatpak-arm64
+
+flatpak-%:
+	$(DOCKER) build --platform=linux/$* -t $(FLATPAK_IMAGE)-$* packaging/flatpak
+	$(DOCKER) run --rm --privileged --platform=linux/$* \
+		--security-opt seccomp=unconfined \
+		--security-opt apparmor=unconfined \
+		-v $(CURDIR):/work -w /work \
+		-v sng-flatpak-cache-$*:/root/.local/share/flatpak \
+		$(FLATPAK_IMAGE)-$* packaging/flatpak/build.sh
+
+snap:
+	$(DOCKER) build -t $(SNAP_IMAGE) packaging/snap
+	$(DOCKER) run --rm \
+		-v $(CURDIR):/work -w /work \
+		-v sng-snap-cache:/root/.cache/snapcraft \
+		$(SNAP_IMAGE) packaging/snap/build.sh
+
+snap-all: snap-amd64 snap-arm64
+
+snap-%:
+	$(DOCKER) build --platform=linux/$* -t $(SNAP_IMAGE)-$* packaging/snap
+	$(DOCKER) run --rm --platform=linux/$* \
+		-v $(CURDIR):/work -w /work \
+		-v sng-snap-cache-$*:/root/.cache/snapcraft \
+		$(SNAP_IMAGE)-$* packaging/snap/build.sh
+
+linux-packages: appimage flatpak snap
+linux-packages-all: appimage-all flatpak-all snap-all
+
+.PHONY: all clean install app dmg icon macos release \
+	appimage appimage-all \
+	flatpak flatpak-all \
+	snap snap-all \
+	linux-packages linux-packages-all

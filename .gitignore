@@ -6,3 +6,12 @@ sng-*
 *.dmg
 SNG.app
 dmg_staging
+dist/
+packaging/appimage/SNG.AppDir/
+packaging/flatpak/build/
+packaging/flatpak/repo/
+packaging/flatpak/.flatpak-builder/
+packaging/snap/parts/
+packaging/snap/stage/
+packaging/snap/prime/
+packaging/snap/*.snap

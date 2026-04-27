@@ -1,0 +1,87 @@
+name: sng
+title: SNG
+version: '1.0.0'
+summary: System and network grapher
+description: |
+  Plot ICMP ping latency, SNMP and local interface throughput,
+  CPU, memory, and load average.
+
+  ICMP ping requires the network-observe interface. After install run:
+
+      sudo snap connect sng:network-observe
+
+  The shell= config directive is disabled in this build because of
+  strict-confinement sandboxing.
+
+base: core22
+grade: stable
+confinement: strict
+license: MIT
+
+apps:
+  sng:
+    command: bin/sng
+    extensions: [gnome]
+    plugs:
+      - network
+      - network-bind
+      - network-observe
+      - home
+
+parts:
+  sdl3:
+    plugin: cmake
+    source: https://github.com/libsdl-org/SDL.git
+    source-tag: release-3.2.10
+    cmake-parameters:
+      - -DCMAKE_INSTALL_PREFIX=/usr
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSDL_STATIC=OFF
+      - -DSDL_TEST_LIBRARY=OFF
+    build-packages:
+      - libfontconfig1-dev
+      - libfreetype-dev
+      - libharfbuzz-dev
+      - libx11-dev
+      - libxext-dev
+      - libxrandr-dev
+      - libxcursor-dev
+      - libxi-dev
+      - libxfixes-dev
+      - libxss-dev
+      - libxkbcommon-dev
+      - libwayland-dev
+      - libdecor-0-dev
+      - libdbus-1-dev
+      - libgl1-mesa-dev
+      - libegl1-mesa-dev
+    stage-packages:
+      - libwayland-client0
+      - libwayland-cursor0
+      - libwayland-egl1
+      - libxkbcommon0
+      - libdecor-0-0
+
+  sdl3-ttf:
+    after: [sdl3]
+    plugin: cmake
+    source: https://github.com/libsdl-org/SDL_ttf.git
+    source-tag: release-3.2.2
+    cmake-parameters:
+      - -DCMAKE_INSTALL_PREFIX=/usr
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSDLTTF_VENDORED=OFF
+
+  sng:
+    after: [sdl3, sdl3-ttf]
+    plugin: nil
+    source: .
+    source-type: local
+    build-packages:
+      - libfontconfig1-dev
+      - pkg-config
+    stage-packages:
+      - libfontconfig1
+    override-build: |
+      make GFX=SDL3 NO_SHELL=1 -j$(nproc)
+      install -Dm755 sng "$CRAFT_PART_INSTALL/bin/sng"

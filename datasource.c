@@ -10,7 +10,9 @@ extern datasource_handler_t memory_handler;
 extern datasource_handler_t snmp_handler;
 extern datasource_handler_t if_thr_handler;
 extern datasource_handler_t loadavg_handler;
+#ifndef NO_SHELL
 extern datasource_handler_t shell_handler;
+#endif
 extern datasource_handler_t clock_handler;
 
 static datasource_handler_t *handlers[] = {
@@ -20,7 +22,9 @@ static datasource_handler_t *handlers[] = {
     &snmp_handler,
     &if_thr_handler,
     &loadavg_handler,
+#ifndef NO_SHELL
     &shell_handler,
+#endif
     &clock_handler,
     NULL
 };
@@ -88,8 +92,12 @@ double datasource_get_max_scale(datasource_t *ds) {
 
 void datasource_set_refresh_interval(datasource_t *ds, int32_t refresh_interval_ms) {
     if (!ds || !ds->handler) return;
+#ifndef NO_SHELL
     if (ds->handler == &shell_handler) {
         extern void shell_set_refresh_interval(void *context, int32_t refresh_interval_ms);
         shell_set_refresh_interval(ds->context, refresh_interval_ms);
     }
+#else
+    (void)refresh_interval_ms;
+#endif
 }

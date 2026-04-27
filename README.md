@@ -75,6 +75,10 @@ sudo chmod +s /path/to/sng
 shell=ping -i 10 1.1.1.1 | sed -l 's/^.*time=//g; s/ ms//g'
 ```
 
+Note: `shell=` is **not available** in the Snap or Flatpak builds (compiled out
+with `NO_SHELL=1`). It works in the AppImage build because that runs natively
+on the host.
+
 ## Config file
 
 If `sng.ini` doesnt exist the app will create you a sample one on start.
@@ -152,11 +156,43 @@ Also you should switch from Wayland to Xorg in `raspi-config` (faster).
 make GFX=<X11|SDL2|SDL3|GTK|GLFW|COCOA>
 ```
 
+To omit the `shell=` directive (required for sandboxed builds):
+
+```
+make GFX=SDL3 NO_SHELL=1
+```
+
 ### macOS / Darwin
 
 ```
 make macos
 ```
+
+### Linux universal packages
+
+Built via Docker (see `packaging/README.md` for details):
+
+```
+make appimage         # AppImage (amd64 by default — runs on most Linux desktops)
+make flatpak          # Flatpak bundle for the host arch
+make snap             # Snap for the host arch
+make linux-packages   # all three (host arch for flatpak/snap, amd64 for AppImage)
+
+# Explicit per-arch:
+make appimage-arm64   # also: appimage-amd64
+make flatpak-arm64    # also: flatpak-amd64
+make snap-arm64       # also: snap-amd64
+
+# Build both arches at once:
+make appimage-all
+make flatpak-all      # cross-arch fails on Apple Silicon (QEMU/bwrap)
+make snap-all
+make linux-packages-all
+```
+
+Output goes to `dist/`. Flatpak and Snap builds compile with `NO_SHELL=1` because the
+`shell=` directive runs inside the sandbox and most host commands are unreachable.
+AppImage runs unsandboxed so `shell=` is kept.
 
 ## Development libraries
 

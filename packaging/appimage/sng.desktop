@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=SNG
+GenericName=System & Network Grapher
+Comment=Plot ping, bandwidth, CPU, memory, load
+Exec=sng
+Icon=sng
+Terminal=false
+Categories=Network;System;Monitor;
+Keywords=ping;graph;monitor;snmp;network;

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.tenox7.sng</id>
+  <name>SNG</name>
+  <summary>System and network grapher</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="io.github.tenox7">
+    <name>Antoni Sawicki</name>
+  </developer>
+  <description>
+    <p>
+      Simple, portable system and network statistics plotter.
+      Graphs ICMP ping latency, SNMP and local interface throughput,
+      CPU, memory, load average, and arbitrary shell command output.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.tenox7.sng.desktop</launchable>
+  <url type="homepage">https://github.com/tenox7/sng</url>
+  <url type="bugtracker">https://github.com/tenox7/sng/issues</url>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.0.0" date="2026-04-26"/>
+  </releases>
+</component>

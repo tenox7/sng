@@ -26,6 +26,7 @@ modules:
     buildsystem: cmake-ninja
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
       - -DSDL_STATIC=OFF
       - -DSDL_TEST_LIBRARY=OFF
     sources:
@@ -38,6 +39,7 @@ modules:
     buildsystem: cmake-ninja
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
       - -DSDLTTF_VENDORED=OFF
     sources:
       - type: git

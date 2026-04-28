@@ -16,6 +16,13 @@ typedef struct {
     uint64_t sum;
     uint32_t sample_count;
     double last;
+    double prev_ping;
+    int has_prev_ping;
+    double jitter;
+    double jitter_min;
+    double jitter_max;
+    double jitter_sum;
+    uint32_t jitter_count;
 } ping_context_t;
 
 static int ping_init(const char *target, void **context) {
@@ -40,6 +47,13 @@ static int ping_init(const char *target, void **context) {
     ctx->sum = 0;
     ctx->sample_count = 0;
     ctx->last = 0.0;
+    ctx->prev_ping = 0.0;
+    ctx->has_prev_ping = 0;
+    ctx->jitter = 0.0;
+    ctx->jitter_min = 10000.0;
+    ctx->jitter_max = 0.0;
+    ctx->jitter_sum = 0.0;
+    ctx->jitter_count = 0;
 
     ctx->ping_ctx = os_ping_create(target, 1000);
     if (!ctx->ping_ctx) {
@@ -51,13 +65,12 @@ static int ping_init(const char *target, void **context) {
     return 1;
 }
 
-static int ping_collect(void *context, double *value) {
-    ping_context_t *ctx;
+static int ping_collect_internal(ping_context_t *ctx, double *value) {
     time_t now;
     double ping_time;
     int success;
+    double diff;
 
-    ctx = (ping_context_t *)context;
     if (!ctx || !value) return 0;
 
     if (ctx->dns_failed || !ctx->ping_ctx) {
@@ -88,14 +101,48 @@ static int ping_collect(void *context, double *value) {
 
     *value = success ? ping_time : -1.0;
 
-    if (success && *value >= 0.0) {
-        if (*value < ctx->min) ctx->min = *value;
-        if (*value > ctx->max) ctx->max = *value;
-        ctx->sum += (uint64_t)*value;
-        ctx->last = *value;
-        ctx->sample_count++;
+    if (!success || *value < 0.0) return success;
+
+    if (*value < ctx->min) ctx->min = *value;
+    if (*value > ctx->max) ctx->max = *value;
+    ctx->sum += (uint64_t)*value;
+    ctx->last = *value;
+    ctx->sample_count++;
+
+    if (ctx->has_prev_ping) {
+        diff = *value - ctx->prev_ping;
+        if (diff < 0.0) diff = -diff;
+        ctx->jitter = ctx->jitter + (diff - ctx->jitter) / 16.0;
+        if (ctx->jitter < ctx->jitter_min) ctx->jitter_min = ctx->jitter;
+        if (ctx->jitter > ctx->jitter_max) ctx->jitter_max = ctx->jitter;
+        ctx->jitter_sum += ctx->jitter;
+        ctx->jitter_count++;
+    }
+    ctx->prev_ping = *value;
+    ctx->has_prev_ping = 1;
+
+    return success;
+}
+
+static int ping_collect(void *context, double *value) {
+    return ping_collect_internal((ping_context_t *)context, value);
+}
+
+static int ping_collect_dual(void *context, double *latency, double *jitter) {
+    ping_context_t *ctx;
+    int success;
+
+    ctx = (ping_context_t *)context;
+    if (!ctx || !latency || !jitter) return 0;
+
+    success = ping_collect_internal(ctx, latency);
+
+    if (!success || *latency < 0.0) {
+        *jitter = -1.0;
+        return success;
     }
 
+    *jitter = ctx->jitter;
     return success;
 }
 
@@ -119,10 +166,19 @@ static int ping_get_stats(void *context, datasource_stats_t *stats) {
     stats->max = ctx->max;
     stats->avg = (double)(ctx->sum / ctx->sample_count);
     stats->last = ctx->last;
-    stats->min_secondary = 0.0;
-    stats->max_secondary = 0.0;
-    stats->avg_secondary = 0.0;
-    stats->last_secondary = 0.0;
+
+    if (ctx->jitter_count == 0) {
+        stats->min_secondary = 0.0;
+        stats->max_secondary = 0.0;
+        stats->avg_secondary = 0.0;
+        stats->last_secondary = 0.0;
+        return 1;
+    }
+
+    stats->min_secondary = ctx->jitter_min;
+    stats->max_secondary = ctx->jitter_max;
+    stats->avg_secondary = ctx->jitter_sum / ctx->jitter_count;
+    stats->last_secondary = ctx->jitter;
 
     return 1;
 }
@@ -142,15 +198,20 @@ static void ping_format_value(double value, char *buffer, size_t buffer_size) {
     snprintf(buffer, buffer_size, "%.1fms", value);
 }
 
+static void ping_format_dual_stats(double latency, double jitter, char *buffer, size_t buffer_size) {
+    snprintf(buffer, buffer_size, "%.1f/%.1fms", latency, jitter);
+}
+
 datasource_handler_t ping_handler = {
     .init = ping_init,
     .collect = ping_collect,
-    .collect_dual = NULL,
+    .collect_dual = ping_collect_dual,
     .get_stats = ping_get_stats,
     .format_value = ping_format_value,
+    .format_dual_stats = ping_format_dual_stats,
     .cleanup = ping_cleanup,
     .name = "ping",
     .unit = "ms",
-    .is_dual = 0,
+    .is_dual = 1,
     .max_scale = 0.0
 };

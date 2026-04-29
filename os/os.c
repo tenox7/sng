@@ -1,4 +1,6 @@
-#if defined(__APPLE__) && defined(__MACH__)
+#if defined(_WIN32)
+    #include "win32.c"
+#elif defined(__APPLE__) && defined(__MACH__)
     #include "darwin.c"
 #elif defined(__linux__)
     #include "linux.c"

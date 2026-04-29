@@ -11,16 +11,19 @@ static void data_source_thread(void *arg) {
     int success;
     double value;
     uint32_t now_ms;
+    plot_timer_t *timer;
 
     source = (data_source_t*)arg;
     if (!source) return;
 
+    timer = os_plot_timer_create((uint32_t)source->refresh_interval_ms);
+    if (!timer) return;
+
     if (!source->datasource) {
         while (1) {
             ringbuf_push(source->data_buffer, -1.0, os_get_time_ms());
-            os_sleep(source->refresh_interval_ms);
+            os_plot_timer_wait(timer);
         }
-        return;
     }
 
     sample_count = 0;
@@ -55,7 +58,7 @@ static void data_source_thread(void *arg) {
             sample_count++;
         }
 
-        os_sleep(source->refresh_interval_ms);
+        os_plot_timer_wait(timer);
     }
 
 }

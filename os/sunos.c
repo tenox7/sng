@@ -468,3 +468,4 @@ int os_get_default_gw_ip(char *buf, size_t buflen) {
     return found;
 }
 #include "unix-ping.c"
+#include "posix_timer.c"

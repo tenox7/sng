@@ -420,3 +420,4 @@ char *os_get_config_path(const char *filename) {
 }
 
 #include "unix-ping.c"
+#include "posix_timer.c"

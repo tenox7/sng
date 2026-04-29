@@ -337,3 +337,4 @@ char *os_get_config_path(const char *filename) {
 }
 #include "icmp_ping.c"
 #include "unix-defgw.c"
+#include "posix_timer.c"

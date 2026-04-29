@@ -23,6 +23,12 @@ struct plot_thread_t {
     DWORD thread_id;
 };
 
+struct plot_timer_t {
+    HANDLE timer_handle;
+    uint32_t interval_ms;
+    uint32_t next_deadline_ms;
+};
+
 const char* os_get_platform_name(void) {
     return "win32";
 }
@@ -253,6 +259,70 @@ int os_plot_thread_join_timeout(plot_thread_t *thread, uint32_t timeout_ms) {
 
     result = WaitForSingleObject(thread->handle, (DWORD)timeout_ms);
     return (result == WAIT_OBJECT_0);
+}
+
+plot_timer_t *os_plot_timer_create(uint32_t interval_ms) {
+    plot_timer_t *timer;
+    LARGE_INTEGER due;
+
+    if (interval_ms == 0) return NULL;
+
+    timer = (plot_timer_t*)malloc(sizeof(plot_timer_t));
+    if (!timer) return NULL;
+
+    timer->timer_handle = CreateWaitableTimer(NULL, FALSE, NULL);
+    if (!timer->timer_handle) {
+        free(timer);
+        return NULL;
+    }
+
+    timer->interval_ms = interval_ms;
+    timer->next_deadline_ms = GetTickCount() + interval_ms;
+
+    due.QuadPart = -((LONGLONG)interval_ms * 10000);
+    if (!SetWaitableTimer(timer->timer_handle, &due, 0, NULL, NULL, FALSE)) {
+        CloseHandle(timer->timer_handle);
+        free(timer);
+        return NULL;
+    }
+
+    return timer;
+}
+
+void os_plot_timer_destroy(plot_timer_t *timer) {
+    if (!timer) return;
+    CancelWaitableTimer(timer->timer_handle);
+    CloseHandle(timer->timer_handle);
+    free(timer);
+}
+
+void os_plot_timer_wait(plot_timer_t *timer) {
+    uint32_t now;
+    int32_t delta;
+    uint32_t suspend_threshold;
+    LARGE_INTEGER due;
+
+    if (!timer) return;
+
+    WaitForSingleObject(timer->timer_handle, INFINITE);
+
+    now = GetTickCount();
+    timer->next_deadline_ms += timer->interval_ms;
+    delta = (int32_t)(timer->next_deadline_ms - now);
+
+    suspend_threshold = timer->interval_ms * 4;
+    if (suspend_threshold < 30000) suspend_threshold = 30000;
+
+    if (delta < -((int32_t)suspend_threshold)) {
+        timer->next_deadline_ms = now + timer->interval_ms;
+        due.QuadPart = -((LONGLONG)timer->interval_ms * 10000);
+    } else if (delta > 0) {
+        due.QuadPart = -((LONGLONG)delta * 10000);
+    } else {
+        due.QuadPart = -10000;
+    }
+
+    SetWaitableTimer(timer->timer_handle, &due, 0, NULL, NULL, FALSE);
 }
 
 char *os_get_config_path(const char *filename) {

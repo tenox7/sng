@@ -367,3 +367,4 @@ int os_get_default_gw_ip(char *buf, size_t buflen) {
     return 0;
 }
 #include "icmp_ping.c"
+#include "linux_timer.c"

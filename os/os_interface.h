@@ -6,6 +6,7 @@
 
 typedef struct plot_mutex_t plot_mutex_t;
 typedef struct plot_thread_t plot_thread_t;
+typedef struct plot_timer_t plot_timer_t;
 
 /* CPU statistics functions - platform-specific implementations */
 int os_cpu_get_stats(double *value);
@@ -44,6 +45,11 @@ plot_thread_t *os_plot_thread_create(void (*func)(void *), void *arg);
 void os_plot_thread_destroy(plot_thread_t *thread);
 void os_plot_thread_join(plot_thread_t *thread);
 int os_plot_thread_join_timeout(plot_thread_t *thread, uint32_t timeout_ms);
+
+/* Periodic timer (kernel-waitable, drift-corrected, suspend-aware) */
+plot_timer_t *os_plot_timer_create(uint32_t interval_ms);
+void os_plot_timer_destroy(plot_timer_t *timer);
+void os_plot_timer_wait(plot_timer_t *timer);
 
 /* Config path function */
 char *os_get_config_path(const char *filename);

@@ -104,7 +104,7 @@ You can also specify the location with `-f /full/path/to/sng.ini`
 
 **[targets]**
 - `ping=<host>` - ICMP echo (e.g., `ping=1.1.1.1`). 
-- `ping=_defgw` - ICMP echo to host's default gateway IP address
+- `ping=0.0.0.0` - ICMP echo to host's default gateway IP address (resolves to read gw IP address from routing table)
 - `bw=local,<interface>` - local interface throughput (e.g., `bw=local,eth0`)
 - `bw=snmp1,<host>,<community>,<ifidx>` - SNMP bandwidth (e.g., `bw=snmp1,192.168.1.1,public,7`)
 - `cpu=local` - CPU usage percentage
@@ -119,7 +119,7 @@ You can also specify the location with `-f /full/path/to/sng.ini`
 
 ## Performance Considerations
 
-This app is meant to be running in background or on a stand alone display. As such, its optimized to consume as little resources as possible rather than be a fast and responsive UI.
+This app is meant to be running in background and its optimized to consume as little resources as possible rather than be a "fast and responsive UI".
 
 SNG supports many UI/Graphics backends. Not all of them behave nicely. If you care about low CPU usage, wasted cycles, power usage - prefer GFX=X11, then GTK3. Avoid SDL - it's not a GUI framework but a multimedia/game library designed for high performance.  It's pretty hard to make it yeld CPU back. SDL will use more CPU cycles on idle.
 
@@ -168,6 +168,12 @@ make GFX=SDL3 NO_SHELL=1
 
 ```
 make macos
+```
+
+### Windows / Win32
+
+```
+nmake -f win32.mak
 ```
 
 ### Linux universal packages

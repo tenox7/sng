@@ -19,7 +19,7 @@ static const char *DEFAULT_CONFIG_INI =
 "font_size=1.0\n"
 "\n"
 "[targets]\n"
-"ping=_defgw\n"
+"ping=0.0.0.0\n"
 "ping=1.1.1.1\n"
 "ping=8.8.8.8\n"
 "cpu=local\n"

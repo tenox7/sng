@@ -77,11 +77,11 @@ static int parse_type_target(const char *type, const char *target, plot_config_t
         }
     }
 
-    if (strcmp(actual_type, "ping") == 0 && strcmp(actual_target, "_defgw") == 0) {
+    if (strcmp(actual_type, "ping") == 0 && strcmp(actual_target, "0.0.0.0") == 0) {
         if (os_get_default_gateway(defgw_buf, sizeof(defgw_buf))) {
             actual_target = defgw_buf;
         } else {
-            fprintf(stderr, "Could not resolve default gateway for ping=_defgw\n");
+            fprintf(stderr, "Could not resolve default gateway for ping=0.0.0.0\n");
             return 0;
         }
     }

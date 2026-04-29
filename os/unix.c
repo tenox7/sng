@@ -336,3 +336,4 @@ char *os_get_config_path(const char *filename) {
     return config_path;
 }
 #include "icmp_ping.c"
+#include "unix-defgw.c"

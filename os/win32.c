@@ -269,6 +269,39 @@ char *os_get_config_path(const char *filename) {
     return config_path;
 }
 
+int os_get_default_gw_ip(char *buf, size_t buflen) {
+    PMIB_IPFORWARDTABLE table;
+    DWORD size, i, nh;
+    unsigned int b0, b1, b2, b3;
+    int found;
+
+    if (!buf || buflen < 16) return 0;
+
+    table = NULL;
+    size = 0;
+    if (GetIpForwardTable(NULL, &size, FALSE) != ERROR_INSUFFICIENT_BUFFER) return 0;
+    table = (PMIB_IPFORWARDTABLE)malloc(size);
+    if (!table) return 0;
+    if (GetIpForwardTable(table, &size, FALSE) != NO_ERROR) { free(table); return 0; }
+
+    found = 0;
+    for (i = 0; i < table->dwNumEntries; i++) {
+        if (table->table[i].dwForwardDest != 0 || table->table[i].dwForwardMask != 0) continue;
+        nh = table->table[i].dwForwardNextHop;
+        if (nh == 0) continue;
+        b0 = (unsigned int)((nh >>  0) & 0xff);
+        b1 = (unsigned int)((nh >>  8) & 0xff);
+        b2 = (unsigned int)((nh >> 16) & 0xff);
+        b3 = (unsigned int)((nh >> 24) & 0xff);
+        sprintf(buf, "%u.%u.%u.%u", b0, b1, b2, b3);
+        found = 1;
+        break;
+    }
+
+    free(table);
+    return found;
+}
+
 struct os_ping_context_t {
     HANDLE icmp;
     IPAddr dest;

@@ -18,6 +18,7 @@
 #include <stdio.h>
 
 #include "icmp_ping.c"
+#include "unix-defgw.c"
 
 struct plot_mutex_t {
     void *handle;

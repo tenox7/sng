@@ -10,6 +10,8 @@ struct plot_thread_t {
 #include <sys/pstat.h>
 #include <sys/mib.h>
 #include <netinet/mib_kern.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
@@ -320,5 +322,52 @@ char *os_get_config_path(const char *filename) {
     }
 
     return config_path;
+}
+
+int os_get_default_gw_ip(char *buf, size_t buflen) {
+    int fd, count, i;
+    struct nmparms p;
+    unsigned int ulen;
+    int val;
+    mib_ipRouteEnt *table;
+    int found;
+    struct in_addr ia;
+    const char *s;
+
+    if (!buf || buflen < 16) return 0;
+
+    fd = open_mib("/dev/ip", O_RDONLY, 0, NM_ASYNC_OFF);
+    if (fd < 0) return 0;
+
+    p.objid  = ID_ipRouteNumEnt;
+    p.buffer = (void *)&val;
+    ulen     = sizeof(val);
+    p.len    = &ulen;
+    if (get_mib_info(fd, &p) != 0 || val <= 0) { close_mib(fd); return 0; }
+    count = val;
+
+    table = (mib_ipRouteEnt *)malloc(count * sizeof(mib_ipRouteEnt));
+    if (!table) { close_mib(fd); return 0; }
+
+    p.objid  = ID_ipRouteTable;
+    p.buffer = (void *)table;
+    ulen     = count * sizeof(mib_ipRouteEnt);
+    p.len    = &ulen;
+    if (get_mib_info(fd, &p) != 0) { free(table); close_mib(fd); return 0; }
+
+    found = 0;
+    for (i = 0; i < count; i++) {
+        if (table[i].Dest != 0 || table[i].Mask != 0) continue;
+        ia.s_addr = table[i].NextHop;
+        s = inet_ntoa(ia);
+        if (!s || !*s || strcmp(s, "0.0.0.0") == 0) continue;
+        snprintf(buf, buflen, "%s", s);
+        found = 1;
+        break;
+    }
+
+    free(table);
+    close_mib(fd);
+    return found;
 }
 #include "unix-ping.c"

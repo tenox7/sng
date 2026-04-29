@@ -336,4 +336,34 @@ char *os_get_config_path(const char *filename) {
 
     return config_path;
 }
+
+int os_get_default_gw_ip(char *buf, size_t buflen) {
+    FILE *fp;
+    char line[256];
+    char iface[64];
+    unsigned long dest, gw, flags, refcnt, use, metric, mask;
+    unsigned int b0, b1, b2, b3;
+
+    if (!buf || buflen < 16) return 0;
+
+    fp = fopen("/proc/net/route", "r");
+    if (!fp) return 0;
+
+    if (!fgets(line, sizeof(line), fp)) { fclose(fp); return 0; }
+
+    while (fgets(line, sizeof(line), fp)) {
+        if (sscanf(line, "%63s %lx %lx %lx %lu %lu %lu %lx",
+                   iface, &dest, &gw, &flags, &refcnt, &use, &metric, &mask) < 3) continue;
+        if (dest != 0) continue;
+        b0 = (unsigned int)((gw >>  0) & 0xff);
+        b1 = (unsigned int)((gw >>  8) & 0xff);
+        b2 = (unsigned int)((gw >> 16) & 0xff);
+        b3 = (unsigned int)((gw >> 24) & 0xff);
+        snprintf(buf, buflen, "%u.%u.%u.%u", b0, b1, b2, b3);
+        fclose(fp);
+        return 1;
+    }
+    fclose(fp);
+    return 0;
+}
 #include "icmp_ping.c"

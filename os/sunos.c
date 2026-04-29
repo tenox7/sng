@@ -9,12 +9,20 @@ struct plot_thread_t {
 };
 #include <kstat.h>
 #include <sys/sysinfo.h>
+#include <sys/types.h>
+#include <sys/stream.h>
+#include <sys/stropts.h>
+#include <sys/tihdr.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/time.h>
 #include <thread.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <inet/mib2.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 const char* os_get_platform_name(void) {
     return "sunos";
@@ -353,5 +361,110 @@ char *os_get_config_path(const char *filename) {
     }
 
     return config_path;
+}
+
+int os_get_default_gw_ip(char *buf, size_t buflen) {
+    int sd;
+    struct strbuf ctlbuf, databuf;
+    char ctl[2048];
+    char *data;
+    size_t data_cap;
+    struct T_optmgmt_req *tor;
+    struct T_optmgmt_ack *toa;
+    struct opthdr *req;
+    int flags, rc;
+    int found;
+    mib2_ipRouteEntry_t *entries;
+    size_t n, i;
+    int is_default;
+    struct in_addr ia;
+    const char *s;
+
+    if (!buf || buflen < 16) return 0;
+
+    sd = open("/dev/arp", O_RDWR);
+    if (sd < 0) sd = open("/dev/ip", O_RDWR);
+    if (sd < 0) return 0;
+
+    if (ioctl(sd, I_PUSH, "tcp") < 0 || ioctl(sd, I_PUSH, "udp") < 0) {
+        close(sd);
+        return 0;
+    }
+
+    data_cap = 65536;
+    data = (char *)malloc(data_cap);
+    if (!data) { close(sd); return 0; }
+
+    tor = (struct T_optmgmt_req *)ctl;
+    tor->PRIM_type = T_OPTMGMT_REQ;
+    tor->OPT_offset = sizeof(struct T_optmgmt_req);
+    tor->OPT_length = sizeof(struct opthdr);
+#ifdef T_CURRENT
+    tor->MGMT_flags = T_CURRENT;
+#else
+    tor->MGMT_flags = MI_T_CURRENT;
+#endif
+    req = (struct opthdr *)(tor + 1);
+    req->level = MIB2_IP;
+    req->name  = 0;
+    req->len   = 0;
+
+    ctlbuf.buf    = ctl;
+    ctlbuf.len    = tor->OPT_length + tor->OPT_offset;
+    ctlbuf.maxlen = sizeof(ctl);
+    if (putmsg(sd, &ctlbuf, NULL, 0) < 0) { free(data); close(sd); return 0; }
+
+    toa = (struct T_optmgmt_ack *)ctl;
+    req = (struct opthdr *)(toa + 1);
+
+    found = 0;
+    for (;;) {
+        flags = 0;
+        ctlbuf.maxlen = sizeof(ctl);
+        ctlbuf.len = 0;
+        rc = getmsg(sd, &ctlbuf, NULL, &flags);
+        if (rc < 0) break;
+
+        if (rc == 0 &&
+            ctlbuf.len >= (int)sizeof(struct T_optmgmt_ack) &&
+            toa->PRIM_type == T_OPTMGMT_ACK &&
+            toa->MGMT_flags == T_SUCCESS &&
+            req->len == 0) break;
+
+        databuf.buf    = data;
+        databuf.maxlen = data_cap;
+        databuf.len    = 0;
+        flags = 0;
+        rc = getmsg(sd, NULL, &databuf, &flags);
+        if (rc < 0) break;
+
+        if (req->level == MIB2_IP && req->name == MIB2_IP_ROUTE) {
+            entries = (mib2_ipRouteEntry_t *)databuf.buf;
+            n = databuf.len / sizeof(mib2_ipRouteEntry_t);
+            for (i = 0; i < n; i++) {
+                is_default = (entries[i].ipRouteInfo.re_ire_type & IRE_DEFAULT) != 0;
+                if (!is_default && entries[i].ipRouteDest == 0 && entries[i].ipRouteMask == 0) is_default = 1;
+                if (!is_default) continue;
+                ia.s_addr = entries[i].ipRouteNextHop;
+                s = inet_ntoa(ia);
+                if (!s || !*s || strcmp(s, "0.0.0.0") == 0) continue;
+                snprintf(buf, buflen, "%s", s);
+                found = 1;
+                break;
+            }
+            if (found) break;
+        }
+        while (rc == MOREDATA) {
+            databuf.len = 0;
+            flags = 0;
+            rc = getmsg(sd, NULL, &databuf, &flags);
+            if (rc < 0) break;
+        }
+    }
+
+    ioctl(sd, I_FLUSH, FLUSHRW);
+    close(sd);
+    free(data);
+    return found;
 }
 #include "unix-ping.c"

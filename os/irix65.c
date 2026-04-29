@@ -1,6 +1,7 @@
 #define _KMEMUSER
 
 #include "os_interface.h"
+#include "unix-defgw.c"
 
 struct plot_mutex_t {
     void *handle;

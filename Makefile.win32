@@ -5,7 +5,7 @@ LIBS=user32.lib gdi32.lib kernel32.lib ws2_32.lib iphlpapi.lib pdh.lib
 
 OBJS=main.obj graphics.obj config.obj plot.obj ringbuf.obj threading.obj \
      ini_parser.obj datasource.obj clock.obj snmp_client.obj ping.obj \
-     cpu.obj memory.obj snmp.obj if_thr.obj loadavg.obj defgw.obj win32.obj
+     cpu.obj memory.obj snmp.obj if_thr.obj loadavg.obj os.obj
 
 TARGET=sng.exe
 

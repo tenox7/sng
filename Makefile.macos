@@ -9,7 +9,7 @@ ifeq ($(UNIVERSAL),1)
     LDFLAGS += -arch x86_64 -arch arm64
 endif
 
-SOURCES = main.c graphics.c config.c plot.c ringbuf.c threading.c ini_parser.c datasource.c ds/snmp_client.c ds/ping.c ds/cpu.c ds/memory.c ds/snmp.c ds/if_thr.c ds/loadavg.c ds/shell.c ds/clock.c os/os.c os/defgw.c
+SOURCES = main.c graphics.c config.c plot.c ringbuf.c threading.c ini_parser.c datasource.c ds/snmp_client.c ds/ping.c ds/cpu.c ds/memory.c ds/snmp.c ds/if_thr.c ds/loadavg.c ds/shell.c ds/clock.c os/os.c
 OBJC_SOURCES = gfx/cocoa.m
 OBJECTS = $(SOURCES:.c=.o)
 OBJC_OBJECTS = $(OBJC_SOURCES:.m=.o)

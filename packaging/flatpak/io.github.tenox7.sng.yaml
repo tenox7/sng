@@ -50,7 +50,7 @@ modules:
   - name: sng
     buildsystem: simple
     build-commands:
-      - make GFX=SDL3 NO_SHELL=1
+      - make -f Makefile.linux NO_SHELL=1
       - install -Dm755 sng /app/bin/sng
       - install -Dm644 packaging/shared/sng.png /app/share/icons/hicolor/256x256/apps/io.github.tenox7.sng.png
       - install -Dm644 packaging/flatpak/io.github.tenox7.sng.desktop /app/share/applications/io.github.tenox7.sng.desktop

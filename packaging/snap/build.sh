@@ -12,8 +12,8 @@ rm -rf "$ROOTFS"
 mkdir -p "$ROOTFS/bin" "$ROOTFS/usr/lib" "$ROOTFS/meta/gui"
 
 cd "$REPO_ROOT"
-make clean
-make GFX=SDL3 NO_SHELL=1
+make -f Makefile.linux clean
+make -f Makefile.linux NO_SHELL=1
 install -m 755 sng "$ROOTFS/bin/sng"
 
 cp packaging/snap/snap/gui/icon.png "$ROOTFS/meta/gui/icon.png"

@@ -1,0 +1,44 @@
+CC = gcc
+CFLAGS = -g -DGFX_X11
+LDFLAGS = -lX11 -lpthread -lm
+
+SOURCES = main.c graphics.c config.c plot.c ringbuf.c threading.c ini_parser.c datasource.c ds/snmp_client.c ds/ping.c ds/cpu.c ds/memory.c ds/snmp.c ds/if_thr.c ds/loadavg.c ds/shell.c ds/clock.c os/os.c os/defgw.c
+OBJECTS = $(SOURCES:.c=.o)
+TARGET = sng
+
+all: $(TARGET)
+
+$(TARGET): $(OBJECTS)
+	$(CC) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+linux:
+	$(MAKE) CFLAGS="-g -DGFX_X11 -DLINUX" LDFLAGS="-lX11 -lpthread -lm"
+
+solaris:
+	$(MAKE) CFLAGS="-g -DGFX_X11" LDFLAGS="-lX11 -lpthread -lm -lsocket -lnsl -lrt -lkstat -lresolv"
+
+hpux:
+	$(MAKE) CFLAGS="-g -DGFX_X11" LDFLAGS="-lX11 -lpthread -lm -lnm"
+
+aix:
+	$(MAKE) CFLAGS="-g -DGFX_X11 -pthread" LDFLAGS="-lX11 -pthread -lm"
+
+unixware:
+	$(MAKE) CFLAGS="-g -DGFX_X11 -DUNIXWARE" LDFLAGS="-lX11 -lthread -lm -lsocket -lnsl -lelf -lmas"
+
+osf1:
+	$(MAKE) CFLAGS="-g -DGFX_X11 -pthread" LDFLAGS="-lX11 -pthread -lm -lmach"
+
+irix:
+	$(MAKE) CFLAGS="-g -DGFX_X11 -isystem /usr/include -D__STDINT_H__" LDFLAGS="-lX11 -lpthread -lelf"
+
+clean:
+	rm -f *.o */*.o $(TARGET)
+
+install: $(TARGET)
+	cp $(TARGET) /usr/local/bin/
+
+.PHONY: all clean install linux solaris hpux aix unixware osf1 irix

@@ -14,8 +14,8 @@ mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/lib" \
          "$APPDIR/usr/share/icons/hicolor/256x256/apps"
 
 cd "$REPO_ROOT"
-make clean
-make GFX=SDL3
+make -f Makefile.linux clean
+make -f Makefile.linux
 
 install -m 755 sng "$APPDIR/usr/bin/sng"
 install -m 644 packaging/shared/sng.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/sng.png"

@@ -173,7 +173,7 @@ make macos
 ### Windows / Win32
 
 ```
-nmake -f win32.mak
+nmake -f Makefile.win32
 ```
 
 ### Linux universal packages

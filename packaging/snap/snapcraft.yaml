@@ -83,5 +83,5 @@ parts:
     stage-packages:
       - libfontconfig1
     override-build: |
-      make GFX=SDL3 NO_SHELL=1 -j$(nproc)
+      make -f Makefile.linux NO_SHELL=1 -j$(nproc)
       install -Dm755 sng "$CRAFT_PART_INSTALL/bin/sng"

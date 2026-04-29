@@ -14,7 +14,6 @@
 - horizontal guides ie softmax or ncpu for load
 - logarithmic ringbuf
 - save ringbuf to file
-- makefiles per platform eg Makefile.aix?
 
 ## Data Sources
 
@@ -30,7 +29,6 @@
 - OpenServer/OpenDesktop
 - NextStep/OpenStep
 - OpenVMS
-- Win32/NT
 - Plan9
 - RiscOS
 - QNX6 / QNX4

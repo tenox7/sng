@@ -63,6 +63,7 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
     int32_t scale_x;
     double temp_buffer[2048];
     double temp_buffer_secondary[2048];
+    uint32_t temp_timestamps[2048];
     uint32_t data_count, head_pos, tail_pos;
     uint32_t data_count_secondary, head_pos_secondary, tail_pos_secondary;
     int32_t prev_out_x, prev_out_y;
@@ -128,11 +129,11 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
         unit = "";
     }
 
-    if (!ringbuf_read_snapshot(plot->data_buffer, temp_buffer, 2048, &data_count, &head_pos, &tail_pos))
+    if (!ringbuf_read_snapshot(plot->data_buffer, temp_buffer, temp_timestamps, 2048, &data_count, &head_pos, &tail_pos))
         return;
 
     if (plot->is_dual && plot->data_buffer_secondary) {
-        if (!ringbuf_read_snapshot(plot->data_buffer_secondary, temp_buffer_secondary, 2048,
+        if (!ringbuf_read_snapshot(plot->data_buffer_secondary, temp_buffer_secondary, NULL, 2048,
                                   &data_count_secondary, &head_pos_secondary, &tail_pos_secondary))
             return;
     }
@@ -290,6 +291,7 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
         int32_t hover_text_x, hover_text_y;
         uint32_t time_offset_ms;
         uint32_t time_seconds, time_minutes, time_hours;
+        uint32_t now_ms;
         char time_text[64];
         char value_text[64];
 
@@ -307,7 +309,8 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
             hover_value = temp_buffer[data_index];
             hover_value_secondary = (plot->is_dual && data_index < data_count_secondary) ? temp_buffer_secondary[data_index] : 0.0;
 
-            time_offset_ms = offset_from_right * refresh_interval;
+            now_ms = os_get_time_ms();
+            time_offset_ms = now_ms - temp_timestamps[data_index];
             time_seconds = time_offset_ms / 1000;
             time_minutes = time_seconds / 60;
             time_hours = time_minutes / 60;

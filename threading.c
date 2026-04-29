@@ -10,13 +10,14 @@ static void data_source_thread(void *arg) {
     double in_value, out_value;
     int success;
     double value;
+    uint32_t now_ms;
 
     source = (data_source_t*)arg;
     if (!source) return;
 
     if (!source->datasource) {
         while (1) {
-            ringbuf_push(source->data_buffer, -1.0);
+            ringbuf_push(source->data_buffer, -1.0, os_get_time_ms());
             os_sleep(source->refresh_interval_ms);
         }
         return;
@@ -29,24 +30,26 @@ static void data_source_thread(void *arg) {
             in_value = 0.0;
             out_value = 0.0;
             success = source->datasource->handler->collect_dual(source->datasource->context, &in_value, &out_value);
+            now_ms = os_get_time_ms();
 
             if (success) {
-                ringbuf_push(source->data_buffer, in_value);
-                ringbuf_push(source->data_buffer_secondary, out_value);
+                ringbuf_push(source->data_buffer, in_value, now_ms);
+                ringbuf_push(source->data_buffer_secondary, out_value, now_ms);
             } else {
-                ringbuf_push(source->data_buffer, -1.0);
-                ringbuf_push(source->data_buffer_secondary, -1.0);
+                ringbuf_push(source->data_buffer, -1.0, now_ms);
+                ringbuf_push(source->data_buffer_secondary, -1.0, now_ms);
             }
 
             sample_count++;
         } else {
             value = 0.0;
             success = datasource_collect(source->datasource, &value);
+            now_ms = os_get_time_ms();
 
             if (success) {
-                ringbuf_push(source->data_buffer, value);
+                ringbuf_push(source->data_buffer, value, now_ms);
             } else {
-                ringbuf_push(source->data_buffer, -1.0);
+                ringbuf_push(source->data_buffer, -1.0, now_ms);
             }
 
             sample_count++;

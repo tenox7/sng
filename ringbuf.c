@@ -18,6 +18,13 @@ ringbuf_t *ringbuf_create(uint32_t size) {
         return NULL;
     }
 
+    ringbuf->timestamps = malloc(sizeof(uint32_t) * size);
+    if (!ringbuf->timestamps) {
+        free(ringbuf->data);
+        free(ringbuf);
+        return NULL;
+    }
+
     ringbuf->size = size;
     atomic_store(&ringbuf->head, 0);
     atomic_store(&ringbuf->tail, 0);
@@ -25,6 +32,7 @@ ringbuf_t *ringbuf_create(uint32_t size) {
 
     ringbuf->write_mutex = os_plot_mutex_create();
     if (!ringbuf->write_mutex) {
+        free(ringbuf->timestamps);
         free(ringbuf->data);
         free(ringbuf);
         return NULL;
@@ -33,12 +41,14 @@ ringbuf_t *ringbuf_create(uint32_t size) {
     ringbuf->resize_mutex = os_plot_mutex_create();
     if (!ringbuf->resize_mutex) {
         os_plot_mutex_destroy(ringbuf->write_mutex);
+        free(ringbuf->timestamps);
         free(ringbuf->data);
         free(ringbuf);
         return NULL;
     }
 
     memset(ringbuf->data, 0, sizeof(double) * size);
+    memset(ringbuf->timestamps, 0, sizeof(uint32_t) * size);
 
     return ringbuf;
 }
@@ -48,12 +58,14 @@ void ringbuf_destroy(ringbuf_t *ringbuf) {
 
     os_plot_mutex_destroy(ringbuf->write_mutex);
     os_plot_mutex_destroy(ringbuf->resize_mutex);
+    free(ringbuf->timestamps);
     free(ringbuf->data);
     free(ringbuf);
 }
 
 int ringbuf_resize(ringbuf_t *ringbuf, uint32_t new_size) {
     double *new_data;
+    uint32_t *new_timestamps;
     uint32_t current_count;
     uint32_t current_head;
     uint32_t current_tail;
@@ -79,6 +91,14 @@ int ringbuf_resize(ringbuf_t *ringbuf, uint32_t new_size) {
         return 0;
     }
 
+    new_timestamps = malloc(sizeof(uint32_t) * new_size);
+    if (!new_timestamps) {
+        free(new_data);
+        os_plot_mutex_unlock(ringbuf->write_mutex);
+        os_plot_mutex_unlock(ringbuf->resize_mutex);
+        return 0;
+    }
+
     current_count = atomic_load(&ringbuf->count);
     current_head = atomic_load(&ringbuf->head);
     current_tail = atomic_load(&ringbuf->tail);
@@ -92,27 +112,32 @@ int ringbuf_resize(ringbuf_t *ringbuf, uint32_t new_size) {
                 src_index = (current_tail + i) % ringbuf->size;
             }
             new_data[i] = ringbuf->data[src_index];
+            new_timestamps[i] = ringbuf->timestamps[src_index];
         }
     }
 
     free(ringbuf->data);
+    free(ringbuf->timestamps);
     ringbuf->data = new_data;
+    ringbuf->timestamps = new_timestamps;
     ringbuf->size = new_size;
     atomic_store(&ringbuf->head, copy_count % new_size);
     atomic_store(&ringbuf->tail, 0);
     atomic_store(&ringbuf->count, copy_count);
 
     memset(&ringbuf->data[copy_count], 0, sizeof(double) * (new_size - copy_count));
+    memset(&ringbuf->timestamps[copy_count], 0, sizeof(uint32_t) * (new_size - copy_count));
 
     os_plot_mutex_unlock(ringbuf->write_mutex);
     os_plot_mutex_unlock(ringbuf->resize_mutex);
     return 1;
 }
 
-int ringbuf_push(ringbuf_t *ringbuf, double value) {
+int ringbuf_push(ringbuf_t *ringbuf, double value, uint32_t timestamp_ms) {
     uint32_t current_head;
     uint32_t current_count;
     uint32_t new_head;
+    uint32_t current_tail;
 
     if (!ringbuf) return 0;
 
@@ -122,13 +147,14 @@ int ringbuf_push(ringbuf_t *ringbuf, double value) {
     current_count = atomic_load(&ringbuf->count);
 
     ringbuf->data[current_head] = value;
+    ringbuf->timestamps[current_head] = timestamp_ms;
     new_head = (current_head + 1) % ringbuf->size;
     atomic_store(&ringbuf->head, new_head);
 
     if (current_count < ringbuf->size) {
         atomic_store(&ringbuf->count, current_count + 1);
     } else {
-        uint32_t current_tail = atomic_load(&ringbuf->tail);
+        current_tail = atomic_load(&ringbuf->tail);
         atomic_store(&ringbuf->tail, (current_tail + 1) % ringbuf->size);
     }
 
@@ -136,7 +162,7 @@ int ringbuf_push(ringbuf_t *ringbuf, double value) {
     return 1;
 }
 
-int ringbuf_pop(ringbuf_t *ringbuf, double *value) {
+int ringbuf_pop(ringbuf_t *ringbuf, double *value, uint32_t *timestamp_ms) {
     uint32_t current_count;
     uint32_t current_tail;
     uint32_t new_tail;
@@ -153,6 +179,7 @@ int ringbuf_pop(ringbuf_t *ringbuf, double *value) {
 
     current_tail = atomic_load(&ringbuf->tail);
     *value = ringbuf->data[current_tail];
+    if (timestamp_ms) *timestamp_ms = ringbuf->timestamps[current_tail];
     new_tail = (current_tail + 1) % ringbuf->size;
     atomic_store(&ringbuf->tail, new_tail);
     atomic_store(&ringbuf->count, current_count - 1);
@@ -179,7 +206,7 @@ int ringbuf_is_empty(ringbuf_t *ringbuf) {
     return (atomic_load(&ringbuf->count) == 0);
 }
 
-int ringbuf_read_snapshot(ringbuf_t *ringbuf, double *buffer, uint32_t buffer_size, uint32_t *count_out, uint32_t *head_out, uint32_t *tail_out) {
+int ringbuf_read_snapshot(ringbuf_t *ringbuf, double *values, uint32_t *timestamps, uint32_t buffer_size, uint32_t *count_out, uint32_t *head_out, uint32_t *tail_out) {
     uint32_t count, head, tail;
     uint32_t attempts;
     const uint32_t max_attempts = 10;
@@ -190,7 +217,7 @@ int ringbuf_read_snapshot(ringbuf_t *ringbuf, double *buffer, uint32_t buffer_si
     uint32_t verify_head;
     uint32_t verify_tail;
 
-    if (!ringbuf || !buffer || !count_out || !head_out || !tail_out) return 0;
+    if (!ringbuf || !values || !count_out || !head_out || !tail_out) return 0;
 
     attempts = 0;
 
@@ -208,7 +235,8 @@ int ringbuf_read_snapshot(ringbuf_t *ringbuf, double *buffer, uint32_t buffer_si
 
         for (i = 0; i < copy_count; i++) {
             idx = (tail + i) % ringbuf->size;
-            buffer[i] = ringbuf->data[idx];
+            values[i] = ringbuf->data[idx];
+            if (timestamps) timestamps[i] = ringbuf->timestamps[idx];
         }
 
         verify_count = atomic_load(&ringbuf->count);

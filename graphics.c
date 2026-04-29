@@ -16,6 +16,8 @@
     #include "gfx/glfw.c"
 #elif defined(GFX_COCOA)
     /* implemented in gfx/cocoa.m, compiled separately */
+#elif defined(GFX_WIN32)
+    #include "gfx/win32.c"
 #else
-    #error "No graphics driver selected. Use -DGFX_SDL3, -DGFX_SDL2, -DGFX_GTK3, -DGFX_X11, -DGFX_GLFW, or -DGFX_COCOA"
+    #error "No graphics driver selected. Use -DGFX_SDL3, -DGFX_SDL2, -DGFX_GTK3, -DGFX_X11, -DGFX_GLFW, -DGFX_COCOA, or -DGFX_WIN32"
 #endif

@@ -23,6 +23,7 @@ Supports multiple graphs with:
 - UnixWare
 - IRIX
 - Tru64
+- Windows/Win32
 
 ## Supported Graphics/UI backends
 
@@ -31,6 +32,7 @@ Supports multiple graphs with:
 - SDL 2/3
 - GLFW
 - COCOA
+- GDI
 
 ## ICMP / Ping permissions
 

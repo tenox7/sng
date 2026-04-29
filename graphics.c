@@ -9,7 +9,9 @@
 #elif defined(GFX_SDL2)
     #include "gfx/sdl2.c"
 #elif defined(GFX_GTK3)
-#include "gfx/gtk3.c"
+    #include "gfx/gtk3.c"
+#elif defined(GFX_GTK2)
+    #include "gfx/gtk2.c"
 #elif defined(GFX_X11)
     #include "gfx/x11.c"
 #elif defined(GFX_GLFW)
@@ -19,5 +21,5 @@
 #elif defined(GFX_WIN32)
     #include "gfx/win32.c"
 #else
-    #error "No graphics driver selected. Use -DGFX_SDL3, -DGFX_SDL2, -DGFX_GTK3, -DGFX_X11, -DGFX_GLFW, -DGFX_COCOA, or -DGFX_WIN32"
+    #error "No graphics driver selected. Use -DGFX_SDL3, -DGFX_SDL2, -DGFX_GTK3, -DGFX_GTK2, -DGFX_X11, -DGFX_GLFW, -DGFX_COCOA, or -DGFX_WIN32"
 #endif

@@ -28,7 +28,7 @@ Supports multiple graphs with:
 ## Supported Graphics/UI backends
 
 - X11
-- GTK
+- GTK 2/3
 - SDL 2/3
 - GLFW
 - COCOA
@@ -155,7 +155,7 @@ Also you should switch from Wayland to Xorg in `raspi-config` (faster).
 ## Building
 
 ```
-make GFX=<X11|SDL2|SDL3|GTK|GLFW|COCOA>
+make GFX=<X11|SDL2|SDL3|GTK2|GTK3|GLFW|COCOA>
 ```
 
 To omit the `shell=` directive (required for sandboxed builds):
@@ -220,6 +220,12 @@ apt install libsdl3-dev libsdl3-ttf-dev libfontconfig1-dev
 
 ```
 apt install libgtk-3-dev libfontconfig1-dev
+```
+
+### GTK2
+
+```
+apt install libgtk2.0-dev libfontconfig1-dev
 ```
 
 ### X11

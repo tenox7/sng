@@ -62,11 +62,13 @@ static int parse_type_target(const char *type, const char *target, plot_config_t
     size_t len;
     char truncated_target[256];
     char defgw_buf[64];
+    int defgw_failed;
 
     if (!type || !target) return 0;
 
     actual_type = type;
     actual_target = target;
+    defgw_failed = 0;
 
     if (strcmp(type, "bw") == 0) {
         if (strncmp(target, "snmp1,", 6) == 0) {
@@ -81,8 +83,7 @@ static int parse_type_target(const char *type, const char *target, plot_config_t
         if (os_get_default_gw_ip(defgw_buf, sizeof(defgw_buf))) {
             actual_target = defgw_buf;
         } else {
-            fprintf(stderr, "Could not resolve default gateway for ping=0.0.0.0\n");
-            return 0;
+            defgw_failed = 1;
         }
     }
 
@@ -114,6 +115,9 @@ static int parse_type_target(const char *type, const char *target, plot_config_t
         snprintf(auto_name, sizeof(auto_name), "%s - %s", type_upper, actual_target);
     }
 
+    if (defgw_failed) {
+        snprintf(auto_name, sizeof(auto_name), "PING - default gw not supported");
+    }
 
     plot->type = malloc(strlen(actual_type) + 1);
     plot->target = malloc(strlen(actual_target) + 1);

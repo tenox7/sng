@@ -82,45 +82,9 @@ int os_get_default_gw_ip(char *buf, size_t buflen) {
 
 #else
 
-#include <stdio.h>
-#include <string.h>
-
-static int defgw_looks_like_ipv4(const char *s) {
-    int dots;
-    int digits;
-
-    dots = 0;
-    digits = 0;
-    while (*s) {
-        if (*s == '.') { dots++; digits = 0; }
-        else if (*s >= '0' && *s <= '9') { digits++; if (digits > 3) return 0; }
-        else return 0;
-        s++;
-    }
-    return dots == 3;
-}
-
 int os_get_default_gw_ip(char *buf, size_t buflen) {
-    FILE *fp;
-    char line[512];
-    char dest[128], gw[128];
-
-    if (!buf || buflen < 16) return 0;
-
-    fp = popen("netstat -rn 2>/dev/null", "r");
-    if (!fp) return 0;
-
-    while (fgets(line, sizeof(line), fp)) {
-        if (sscanf(line, "%127s %127s", dest, gw) != 2) continue;
-        if (strcmp(dest, "default") != 0 &&
-            strcmp(dest, "0.0.0.0") != 0 &&
-            strcmp(dest, "0.0.0.0/0") != 0) continue;
-        if (!defgw_looks_like_ipv4(gw)) continue;
-        snprintf(buf, buflen, "%s", gw);
-        pclose(fp);
-        return 1;
-    }
-    pclose(fp);
+    (void)buf;
+    (void)buflen;
     return 0;
 }
 

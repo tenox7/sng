@@ -11,6 +11,7 @@ typedef struct {
     char *target;
     time_t last_dns_retry;
     int dns_failed;
+    int permanent_error;
     double min;
     double max;
     uint64_t sum;
@@ -42,6 +43,7 @@ static int ping_init(const char *target, void **context) {
     ctx->ping_ctx = NULL;
     ctx->last_dns_retry = 0;
     ctx->dns_failed = 0;
+    ctx->permanent_error = 0;
     ctx->min = 10000.0;
     ctx->max = 0.0;
     ctx->sum = 0;
@@ -54,6 +56,12 @@ static int ping_init(const char *target, void **context) {
     ctx->jitter_max = 0.0;
     ctx->jitter_sum = 0.0;
     ctx->jitter_count = 0;
+
+    if (strcmp(target, "0.0.0.0") == 0) {
+        ctx->permanent_error = 1;
+        *context = ctx;
+        return 1;
+    }
 
     ctx->ping_ctx = os_ping_create(target, 1000);
     if (!ctx->ping_ctx) {
@@ -72,6 +80,11 @@ static int ping_collect_internal(ping_context_t *ctx, double *value) {
     double diff;
 
     if (!ctx || !value) return 0;
+
+    if (ctx->permanent_error) {
+        *value = -1.0;
+        return 0;
+    }
 
     if (ctx->dns_failed || !ctx->ping_ctx) {
         now = time(NULL);

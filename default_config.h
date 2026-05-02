@@ -1,7 +1,7 @@
 #ifndef DEFAULT_CONFIG_H
 #define DEFAULT_CONFIG_H
 
-static const char *DEFAULT_CONFIG_INI =
+static const char *DEFAULT_CONFIG_HEAD =
 "[global]\n"
 "background_color=646464\n"
 "text_color=FFFFFF\n"
@@ -18,8 +18,11 @@ static const char *DEFAULT_CONFIG_INI =
 "fps_counter=false\n"
 "font_size=1.0\n"
 "\n"
-"[targets]\n"
-"ping=0.0.0.0\n"
+"[targets]\n";
+
+static const char *DEFAULT_CONFIG_DEFGW = "ping=0.0.0.0\n";
+
+static const char *DEFAULT_CONFIG_TAIL =
 "ping=1.1.1.1\n"
 "ping=8.8.8.8\n"
 "cpu=local\n"

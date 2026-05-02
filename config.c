@@ -25,13 +25,18 @@ static color_t mk_color(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
 static char *create_default_config_file(const char *path) {
     static char config_path[512];
     FILE *f;
+    char defgw_buf[64];
 
     strncpy(config_path, path, sizeof(config_path) - 1);
     config_path[sizeof(config_path) - 1] = '\0';
     f = fopen(config_path, "w");
     if (!f) return NULL;
 
-    fprintf(f, "%s", DEFAULT_CONFIG_INI);
+    fprintf(f, "%s", DEFAULT_CONFIG_HEAD);
+    if (os_get_default_gw_ip(defgw_buf, sizeof(defgw_buf))) {
+        fprintf(f, "%s", DEFAULT_CONFIG_DEFGW);
+    }
+    fprintf(f, "%s", DEFAULT_CONFIG_TAIL);
     fclose(f);
 
     return config_path;

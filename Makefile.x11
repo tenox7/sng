@@ -15,25 +15,25 @@ $(TARGET): $(OBJECTS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 linux:
-	$(MAKE) CFLAGS="-g -DGFX_X11 -DLINUX" LDFLAGS="-lX11 -lpthread -lm"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -DLINUX" LDFLAGS="-lX11 -lpthread -lm"
 
 solaris:
-	$(MAKE) CFLAGS="-g -DGFX_X11" LDFLAGS="-lX11 -lpthread -lm -lsocket -lnsl -lrt -lkstat -lresolv"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11" LDFLAGS="-lX11 -lpthread -lm -lsocket -lnsl -lrt -lkstat -lresolv"
 
 hpux:
-	$(MAKE) CFLAGS="-g -DGFX_X11" LDFLAGS="-lX11 -lpthread -lm -lnm"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11" LDFLAGS="-lX11 -lpthread -lm -lnm"
 
 aix:
-	$(MAKE) CFLAGS="-g -DGFX_X11 -pthread" LDFLAGS="-lX11 -pthread -lm"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -pthread" LDFLAGS="-lX11 -pthread -lm"
 
 unixware:
-	$(MAKE) CFLAGS="-g -DGFX_X11 -DUNIXWARE" LDFLAGS="-lX11 -lthread -lm -lsocket -lnsl -lelf -lmas"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -DUNIXWARE" LDFLAGS="-lX11 -lthread -lm -lsocket -lnsl -lelf -lmas"
 
 osf1:
-	$(MAKE) CFLAGS="-g -DGFX_X11 -pthread" LDFLAGS="-lX11 -pthread -lm -lmach"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -pthread" LDFLAGS="-lX11 -pthread -lm -lmach"
 
 irix:
-	$(MAKE) CFLAGS="-g -DGFX_X11 -isystem /usr/include -D__STDINT_H__" LDFLAGS="-lX11 -lpthread -lelf"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -isystem /usr/include -D__STDINT_H__" LDFLAGS="-lX11 -lpthread -lelf"
 
 clean:
 	rm -f *.o */*.o $(TARGET)

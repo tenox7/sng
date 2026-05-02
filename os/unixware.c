@@ -413,8 +413,7 @@ int os_plot_thread_join_timeout(plot_thread_t *thread, uint32_t timeout_ms) {
 }
 
 char *os_get_config_path(const char *filename) {
-    (void)filename;
-    return NULL;
+    return (char *)filename;
 }
 
 #include "unix-ping.c"

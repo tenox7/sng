@@ -326,21 +326,7 @@ int os_plot_thread_join_timeout(plot_thread_t *thread, uint32_t timeout_ms) {
 }
 
 char *os_get_config_path(const char *filename) {
-    char *home;
-    static char config_path[512];
-    char *xdg_config;
-
-    home = getenv("HOME");
-    if (!home) return NULL;
-
-    xdg_config = getenv("XDG_CONFIG_HOME");
-    if (xdg_config) {
-        snprintf(config_path, sizeof(config_path), "%s/sng/%s", xdg_config, filename);
-    } else {
-        snprintf(config_path, sizeof(config_path), "%s/.config/sng/%s", home, filename);
-    }
-
-    return config_path;
+    return (char *)filename;
 }
 #include "icmp_ping.c"
 #include "kqueue_timer.c"

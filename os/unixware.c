@@ -1,5 +1,79 @@
 #include "os_interface.h"
-#include "unix-defgw.c"
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/stropts.h>
+#include <net/route.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+int os_get_default_gw_ip(char *buf, size_t buflen) {
+    struct rt_giarg gi;
+    struct rt_msghdr *rtm;
+    struct sockaddr *sa, *dst, *gw;
+    struct sockaddr_in *d, *g;
+    char *rtbuf, *next, *lim;
+    const char *s;
+    int fd, i;
+
+    if (!buf || buflen < 16) return 0;
+
+    fd = open("/dev/route", O_RDONLY);
+    if (fd < 0) return 0;
+
+    gi.gi_op = KINFO_RT_DUMP;
+    gi.gi_where = 0;
+    gi.gi_size = 0;
+    gi.gi_arg = 0;
+    if (ioctl(fd, RTSTR_GETROUTE, &gi) < 0) { close(fd); return 0; }
+
+    rtbuf = (char *)malloc(gi.gi_size);
+    if (!rtbuf) { close(fd); return 0; }
+
+    ((struct rt_giarg *)rtbuf)->gi_size = gi.gi_size;
+    ((struct rt_giarg *)rtbuf)->gi_op = KINFO_RT_DUMP;
+    ((struct rt_giarg *)rtbuf)->gi_where = (caddr_t)rtbuf;
+    ((struct rt_giarg *)rtbuf)->gi_arg = 0;
+    if (ioctl(fd, RTSTR_GETROUTE, rtbuf) < 0) { free(rtbuf); close(fd); return 0; }
+    close(fd);
+
+    lim = rtbuf + ((struct rt_giarg *)rtbuf)->gi_size;
+    next = rtbuf + sizeof(struct rt_giarg);
+
+    for (; next < lim; next += rtm->rtm_msglen) {
+        rtm = (struct rt_msghdr *)next;
+        if (rtm->rtm_version != RTM_VERSION) continue;
+        if (!(rtm->rtm_flags & RTF_GATEWAY)) continue;
+        if (!(rtm->rtm_addrs & RTA_DST) || !(rtm->rtm_addrs & RTA_GATEWAY)) continue;
+
+        sa = (struct sockaddr *)(rtm + 1);
+        dst = gw = NULL;
+        for (i = 0; i < RTAX_MAX; i++) {
+            if (!(rtm->rtm_addrs & (1 << i))) continue;
+            if (i == RTAX_DST) dst = sa;
+            else if (i == RTAX_GATEWAY) gw = sa;
+            sa = (struct sockaddr *)((char *)sa + sizeof(struct sockaddr));
+        }
+
+        if (!dst || dst->sa_family != AF_INET) continue;
+        if (!gw || gw->sa_family != AF_INET) continue;
+        d = (struct sockaddr_in *)dst;
+        g = (struct sockaddr_in *)gw;
+        if (d->sin_addr.s_addr != INADDR_ANY) continue;
+
+        s = inet_ntoa(g->sin_addr);
+        if (!s) { free(rtbuf); return 0; }
+        snprintf(buf, buflen, "%s", s);
+        free(rtbuf);
+        return 1;
+    }
+    free(rtbuf);
+    return 0;
+}
 
 struct plot_mutex_t {
     void *handle;

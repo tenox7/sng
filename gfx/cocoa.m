@@ -124,7 +124,10 @@ typedef struct {
     int width;
     int height;
     int focused;
-    NSBezierPath *line_batch;
+    CGContextRef cg_ctx;
+    CGPoint *segments;
+    int seg_count;
+    int seg_capacity;
     NSColor *cached_color;
     uint32_t cached_color_key;
 } cocoa_renderer_t;
@@ -140,10 +143,11 @@ static double now_seconds(void) {
 }
 
 static void flush_line_batch(cocoa_renderer_t *cr) {
-    if (!cr->line_batch) return;
-    if ([cr->line_batch elementCount] > 0) [cr->line_batch stroke];
-    [cr->line_batch release];
-    cr->line_batch = nil;
+    if (cr->seg_count == 0 || !cr->cg_ctx) return;
+    CGContextSetShouldAntialias(cr->cg_ctx, false);
+    CGContextStrokeLineSegments(cr->cg_ctx, cr->segments, (size_t)cr->seg_count);
+    CGContextSetShouldAntialias(cr->cg_ctx, true);
+    cr->seg_count = 0;
 }
 
 int graphics_init(void) {
@@ -309,7 +313,7 @@ void renderer_destroy(renderer_t *renderer) {
     if (!renderer) return;
     cr = (cocoa_renderer_t *)renderer->handle;
     if (cr) {
-        [cr->line_batch release];
+        free(cr->segments);
         [cr->cached_color release];
         [cr->image release];
         free(cr);
@@ -339,6 +343,9 @@ static void begin_draw(cocoa_renderer_t *cr) {
     if (cr->focused) return;
     ensure_backing(cr);
     [cr->image lockFocus];
+    cr->cg_ctx = [[NSGraphicsContext currentContext] CGContext];
+    CGContextSetLineWidth(cr->cg_ctx, 1.0);
+    CGContextSetLineCap(cr->cg_ctx, kCGLineCapButt);
     cr->focused = 1;
 }
 
@@ -385,6 +392,7 @@ void renderer_present(renderer_t *renderer) {
     if (cr->focused) {
         flush_line_batch(cr);
         [cr->image unlockFocus];
+        cr->cg_ctx = NULL;
         cr->focused = 0;
     }
     [cr->cw->view setNeedsDisplay:YES];
@@ -402,18 +410,24 @@ void renderer_set_color(renderer_t *renderer, color_t color) {
 
 void renderer_draw_line(renderer_t *renderer, int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
     cocoa_renderer_t *cr;
-    CGFloat fy1, fy2;
+    int new_cap;
+    CGPoint *new_segs;
     if (!renderer) return;
     cr = (cocoa_renderer_t *)renderer->handle;
     if (!cr->focused) begin_draw(cr);
-    if (!cr->line_batch) {
-        cr->line_batch = [[NSBezierPath alloc] init];
-        [cr->line_batch setLineWidth:1.0];
+    if (cr->seg_count + 2 > cr->seg_capacity) {
+        new_cap = cr->seg_capacity ? cr->seg_capacity * 2 : 128;
+        new_segs = (CGPoint *)realloc(cr->segments, (size_t)new_cap * sizeof(CGPoint));
+        if (!new_segs) return;
+        cr->segments = new_segs;
+        cr->seg_capacity = new_cap;
     }
-    fy1 = (CGFloat)cr->height - (CGFloat)y1 - 0.5;
-    fy2 = (CGFloat)cr->height - (CGFloat)y2 - 0.5;
-    [cr->line_batch moveToPoint:NSMakePoint((CGFloat)x1 + 0.5, fy1)];
-    [cr->line_batch lineToPoint:NSMakePoint((CGFloat)x2 + 0.5, fy2)];
+    cr->segments[cr->seg_count].x = (CGFloat)x1 + 0.5;
+    cr->segments[cr->seg_count].y = (CGFloat)cr->height - (CGFloat)y1 - 0.5;
+    cr->seg_count++;
+    cr->segments[cr->seg_count].x = (CGFloat)x2 + 0.5;
+    cr->segments[cr->seg_count].y = (CGFloat)cr->height - (CGFloat)y2 - 0.5;
+    cr->seg_count++;
 }
 
 void renderer_draw_rect(renderer_t *renderer, rect_t rect) {

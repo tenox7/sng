@@ -1,8 +1,12 @@
 #include "os_interface.h"
 
+#ifndef _SOCKADDR_LEN
 #define _SOCKADDR_LEN 1
+#endif
 #include <sys/types.h>
+#include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
@@ -27,6 +31,8 @@ int os_get_default_gw_ip(char *buf, size_t buflen) {
     char rbuf[2048];
     struct rt_msghdr *rtm;
     struct sockaddr *sa, *gw;
+    struct timeval tv;
+    fd_set rfds;
     const char *str;
 
     if (!buf || buflen < 16) return 0;
@@ -54,11 +60,17 @@ int os_get_default_gw_ip(char *buf, size_t buflen) {
     if (write(s, &req, sizeof(req)) < 0) { close(s); return 0; }
 
     for (;;) {
+        FD_ZERO(&rfds);
+        FD_SET(s, &rfds);
+        tv.tv_sec = 2;
+        tv.tv_usec = 0;
+        if (select(s + 1, &rfds, NULL, NULL, &tv) <= 0) { close(s); return 0; }
         n = read(s, rbuf, sizeof(rbuf));
         if (n <= 0) { close(s); return 0; }
         rtm = (struct rt_msghdr *)rbuf;
         if (rtm->rtm_version != RTM_VERSION) continue;
-        if (rtm->rtm_type == RTM_GET && rtm->rtm_seq == seq && rtm->rtm_pid == pid) break;
+        if (rtm->rtm_type == RTM_GET && rtm->rtm_seq == seq &&
+            (rtm->rtm_pid == pid || rtm->rtm_pid == 0)) break;
     }
     close(s);
 

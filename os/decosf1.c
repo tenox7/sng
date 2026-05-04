@@ -1,5 +1,5 @@
 #include "os_interface.h"
-#include "osf1-defgw.c"
+#include "rtsock-defgw.c"
 
 struct plot_mutex_t {
     void *handle;

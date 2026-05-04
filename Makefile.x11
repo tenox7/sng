@@ -21,7 +21,7 @@ solaris:
 	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11" LDFLAGS="-lX11 -lpthread -lm -lsocket -lnsl -lrt -lkstat -lresolv"
 
 hpux:
-	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11" LDFLAGS="-lX11 -lpthread -lm -lnm"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11" LDFLAGS="-L/usr/lib/X11R6 -lX11 -lpthread -lm -lnm"
 
 aix:
 	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -pthread" LDFLAGS="-lX11 -pthread -lm"

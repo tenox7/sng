@@ -124,6 +124,9 @@ typedef struct {
     int width;
     int height;
     int focused;
+    NSBezierPath *line_batch;
+    NSColor *cached_color;
+    uint32_t cached_color_key;
 } cocoa_renderer_t;
 
 typedef struct {
@@ -134,6 +137,13 @@ static double now_seconds(void) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return (double)tv.tv_sec + (double)tv.tv_usec / 1e6;
+}
+
+static void flush_line_batch(cocoa_renderer_t *cr) {
+    if (!cr->line_batch) return;
+    if ([cr->line_batch elementCount] > 0) [cr->line_batch stroke];
+    [cr->line_batch release];
+    cr->line_batch = nil;
 }
 
 int graphics_init(void) {
@@ -299,6 +309,8 @@ void renderer_destroy(renderer_t *renderer) {
     if (!renderer) return;
     cr = (cocoa_renderer_t *)renderer->handle;
     if (cr) {
+        [cr->line_batch release];
+        [cr->cached_color release];
         [cr->image release];
         free(cr);
     }
@@ -330,7 +342,26 @@ static void begin_draw(cocoa_renderer_t *cr) {
     cr->focused = 1;
 }
 
-static NSColor *make_color(color_t c) {
+static uint32_t color_key(color_t c) {
+    return ((uint32_t)c.r << 24) | ((uint32_t)c.g << 16)
+         | ((uint32_t)c.b << 8) | (uint32_t)c.a;
+}
+
+static NSColor *make_color(cocoa_renderer_t *cr, color_t c) {
+    uint32_t key;
+    key = color_key(c);
+    if (cr && cr->cached_color && cr->cached_color_key == key) {
+        return cr->cached_color;
+    }
+    if (cr) {
+        [cr->cached_color release];
+        cr->cached_color = [[NSColor colorWithCalibratedRed:(CGFloat)c.r / 255.0
+                                                      green:(CGFloat)c.g / 255.0
+                                                       blue:(CGFloat)c.b / 255.0
+                                                      alpha:(CGFloat)c.a / 255.0] retain];
+        cr->cached_color_key = key;
+        return cr->cached_color;
+    }
     return [NSColor colorWithCalibratedRed:(CGFloat)c.r / 255.0
                                      green:(CGFloat)c.g / 255.0
                                       blue:(CGFloat)c.b / 255.0
@@ -342,7 +373,8 @@ void renderer_clear(renderer_t *renderer, color_t color) {
     if (!renderer) return;
     cr = (cocoa_renderer_t *)renderer->handle;
     begin_draw(cr);
-    [make_color(color) set];
+    flush_line_batch(cr);
+    [make_color(cr, color) set];
     NSRectFill(NSMakeRect(0, 0, cr->width, cr->height));
 }
 
@@ -351,6 +383,7 @@ void renderer_present(renderer_t *renderer) {
     if (!renderer) return;
     cr = (cocoa_renderer_t *)renderer->handle;
     if (cr->focused) {
+        flush_line_batch(cr);
         [cr->image unlockFocus];
         cr->focused = 0;
     }
@@ -363,23 +396,24 @@ void renderer_set_color(renderer_t *renderer, color_t color) {
     if (!renderer) return;
     cr = (cocoa_renderer_t *)renderer->handle;
     if (!cr->focused) begin_draw(cr);
-    [make_color(color) set];
+    flush_line_batch(cr);
+    [make_color(cr, color) set];
 }
 
 void renderer_draw_line(renderer_t *renderer, int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
     cocoa_renderer_t *cr;
-    NSBezierPath *path;
     CGFloat fy1, fy2;
     if (!renderer) return;
     cr = (cocoa_renderer_t *)renderer->handle;
     if (!cr->focused) begin_draw(cr);
+    if (!cr->line_batch) {
+        cr->line_batch = [[NSBezierPath alloc] init];
+        [cr->line_batch setLineWidth:1.0];
+    }
     fy1 = (CGFloat)cr->height - (CGFloat)y1 - 0.5;
     fy2 = (CGFloat)cr->height - (CGFloat)y2 - 0.5;
-    path = [NSBezierPath bezierPath];
-    [path setLineWidth:1.0];
-    [path moveToPoint:NSMakePoint((CGFloat)x1 + 0.5, fy1)];
-    [path lineToPoint:NSMakePoint((CGFloat)x2 + 0.5, fy2)];
-    [path stroke];
+    [cr->line_batch moveToPoint:NSMakePoint((CGFloat)x1 + 0.5, fy1)];
+    [cr->line_batch lineToPoint:NSMakePoint((CGFloat)x2 + 0.5, fy2)];
 }
 
 void renderer_draw_rect(renderer_t *renderer, rect_t rect) {
@@ -388,6 +422,7 @@ void renderer_draw_rect(renderer_t *renderer, rect_t rect) {
     if (!renderer) return;
     cr = (cocoa_renderer_t *)renderer->handle;
     if (!cr->focused) begin_draw(cr);
+    flush_line_batch(cr);
     fy = (CGFloat)cr->height - (CGFloat)rect.y - (CGFloat)rect.h;
     NSFrameRect(NSMakeRect((CGFloat)rect.x + 0.5, fy + 0.5,
                            (CGFloat)rect.w, (CGFloat)rect.h));
@@ -399,6 +434,7 @@ void renderer_fill_rect(renderer_t *renderer, rect_t rect) {
     if (!renderer) return;
     cr = (cocoa_renderer_t *)renderer->handle;
     if (!cr->focused) begin_draw(cr);
+    flush_line_batch(cr);
     fy = (CGFloat)cr->height - (CGFloat)rect.y - (CGFloat)rect.h;
     NSRectFill(NSMakeRect((CGFloat)rect.x, fy,
                           (CGFloat)rect.w, (CGFloat)rect.h));
@@ -440,7 +476,7 @@ void font_destroy(font_t *font) {
 
 static NSDictionary *text_attrs(cocoa_font_t *cf, color_t color) {
     NSColor *c;
-    c = make_color(color);
+    c = make_color(NULL, color);
     return [NSDictionary dictionaryWithObjectsAndKeys:
             cf->nsfont, NSFontAttributeName,
             c, NSForegroundColorAttributeName,
@@ -460,6 +496,7 @@ void font_draw_text(renderer_t *renderer, font_t *font, color_t color,
     cr = (cocoa_renderer_t *)renderer->handle;
     cf = (cocoa_font_t *)font->handle;
     if (!cr->focused) begin_draw(cr);
+    flush_line_batch(cr);
 
     str = [NSString stringWithUTF8String:text];
     if (!str) return;

@@ -87,6 +87,10 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
     char formatted[64];
     char avg_formatted[64];
     char last_formatted[64];
+    uint32_t now_ms;
+    int32_t pixel_offset;
+    int32_t plot_max_offset;
+    uint32_t dual_count;
 
     if (!plot || !renderer || !font) return;
     
@@ -138,6 +142,13 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
             return;
     }
 
+    now_ms = os_get_time_ms();
+    refresh_interval = (plot->config->refresh_interval_ms > 0) ?
+                      plot->config->refresh_interval_ms :
+                      global_config->refresh_interval_ms;
+    plot_max_offset = width - 3;
+    if (plot_max_offset < 0) plot_max_offset = 0;
+
     if (fixed_max_scale > 0.0) {
         max_val = fixed_max_scale;
     } else {
@@ -172,7 +183,6 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
     font_draw_text(renderer, font, global_config->text_color, scale_x, y + 5, scale_text);
 
     if (plot->is_dual && plot->data_buffer_secondary) {
-        uint32_t dual_count;
         prev_out_x = -1;
         prev_out_y = -1;
         dual_count = (data_count < data_count_secondary) ? data_count : data_count_secondary;
@@ -181,7 +191,12 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
             in_value = temp_buffer[i];
             out_value = temp_buffer_secondary[i];
 
-            plot_x = x + width - 2 - (dual_count - 1 - i);
+            pixel_offset = (int32_t)((now_ms - temp_timestamps[i]) / (uint32_t)refresh_interval);
+            if (pixel_offset < 0 || pixel_offset > plot_max_offset) {
+                prev_out_x = prev_out_y = -1;
+                continue;
+            }
+            plot_x = x + width - 2 - pixel_offset;
             plot_bottom = plot_y + plot_height - 2;
 
             if (in_value < 0 || out_value < 0) {
@@ -211,9 +226,13 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
             }
         }
     } else {
+        dual_count = data_count;
         for (i = 0; i < data_count; i++) {
             value = temp_buffer[i];
-            plot_x = x + width - 2 - (data_count - 1 - i);
+
+            pixel_offset = (int32_t)((now_ms - temp_timestamps[i]) / (uint32_t)refresh_interval);
+            if (pixel_offset < 0 || pixel_offset > plot_max_offset) continue;
+            plot_x = x + width - 2 - pixel_offset;
             plot_bottom = plot_y + plot_height - 2;
 
             if (value < 0) {
@@ -260,10 +279,7 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
     font_draw_text(renderer, font, global_config->text_color, text_x, y + height - 15, stats_text);
 
     buffer_size = plot->data_buffer->size;
-    refresh_interval = (plot->config->refresh_interval_ms > 0) ?
-                      plot->config->refresh_interval_ms :
-                      global_config->refresh_interval_ms;
-    total_time_ms = buffer_size * refresh_interval;
+    total_time_ms = buffer_size * (uint32_t)refresh_interval;
     if (total_time_ms < 60000) {
         snprintf(time_span_text, sizeof(time_span_text), "%us", total_time_ms / 1000);
     } else if (total_time_ms < 86400000) {
@@ -284,14 +300,17 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
     if (hover_x >= x && hover_x < x + width && hover_y >= plot_y && hover_y < plot_y + plot_height) {
         int32_t guide_x, guide_top, guide_bottom;
         uint32_t data_index;
-        int32_t offset_from_right;
+        int32_t sample_pixel_offset;
+        int32_t sample_plot_x;
+        int32_t distance;
+        int32_t best_distance;
+        int hover_found;
         double hover_value;
         char hover_text[128];
         int32_t hover_text_width, hover_text_height;
         int32_t hover_text_x, hover_text_y;
         uint32_t time_offset_ms;
         uint32_t time_seconds, time_minutes, time_hours;
-        uint32_t now_ms;
         char time_text[64];
         char value_text[64];
 
@@ -302,14 +321,27 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
         renderer_set_color(renderer, border_color);
         renderer_draw_line(renderer, guide_x, guide_top, guide_x, guide_bottom);
 
-        offset_from_right = (x + width - 2) - hover_x;
-        if (offset_from_right >= 0 && offset_from_right < (int32_t)data_count) {
+        hover_found = 0;
+        best_distance = 3;
+        data_index = 0;
+        for (i = 0; i < dual_count; i++) {
+            sample_pixel_offset = (int32_t)((now_ms - temp_timestamps[i]) / (uint32_t)refresh_interval);
+            if (sample_pixel_offset < 0 || sample_pixel_offset > plot_max_offset) continue;
+            sample_plot_x = x + width - 2 - sample_pixel_offset;
+            distance = sample_plot_x - hover_x;
+            if (distance < 0) distance = -distance;
+            if (distance <= best_distance) {
+                best_distance = distance;
+                data_index = i;
+                hover_found = 1;
+            }
+        }
+
+        if (hover_found) {
             double hover_value_secondary;
-            data_index = data_count - 1 - offset_from_right;
             hover_value = temp_buffer[data_index];
             hover_value_secondary = (plot->is_dual && data_index < data_count_secondary) ? temp_buffer_secondary[data_index] : 0.0;
 
-            now_ms = os_get_time_ms();
             time_offset_ms = now_ms - temp_timestamps[data_index];
             time_seconds = time_offset_ms / 1000;
             time_minutes = time_seconds / 60;

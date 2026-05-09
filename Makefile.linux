@@ -24,6 +24,18 @@ $(TARGET): $(OBJECTS)
 clean:
 	rm -f *.o */*.o $(TARGET)
 
+distclean: clean
+	rm -rf packaging/flatpak/.flatpak-builder
+	rm -rf packaging/flatpak/build
+	rm -rf packaging/flatpak/repo
+	rm -rf packaging/appimage/SNG.AppDir
+	rm -rf packaging/snap/parts
+	rm -rf packaging/snap/stage
+	rm -rf packaging/snap/prime
+	rm -rf packaging/snap/sng-snap
+	rm -f  packaging/snap/*.snap
+	rm -rf dist
+
 install: $(TARGET)
 	cp $(TARGET) /usr/local/bin/
 
@@ -83,7 +95,7 @@ snap-%:
 linux-packages: appimage flatpak snap
 linux-packages-all: appimage-all flatpak-all snap-all
 
-.PHONY: all clean install \
+.PHONY: all clean distclean install \
 	appimage appimage-all \
 	flatpak flatpak-all \
 	snap snap-all \

@@ -254,4 +254,4 @@ SNG is inspired by:
 - [SRG](https://sourceforge.net/projects/snmprg/)
 - [Conky](https://github.com/brndnmtthws/conky)
 - [GKrellM](https://gkrellm.srcbox.net/)
-
+- xsysinfo on SVR4

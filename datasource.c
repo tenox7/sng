@@ -5,6 +5,7 @@
 #include <string.h>
 
 extern datasource_handler_t ping_handler;
+extern datasource_handler_t tcp_handler;
 extern datasource_handler_t cpu_handler;
 extern datasource_handler_t memory_handler;
 extern datasource_handler_t snmp_handler;
@@ -17,6 +18,7 @@ extern datasource_handler_t clock_handler;
 
 static datasource_handler_t *handlers[] = {
     &ping_handler,
+    &tcp_handler,
     &cpu_handler,
     &memory_handler,
     &snmp_handler,

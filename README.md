@@ -5,6 +5,7 @@ Simple, portable, network and system stats plotting tool.
 Supports multiple graphs with:
 
 - Ping / ICMP Echo
+- TCP connect latency
 - SNMP and local interface bandwidth throughput
 - Some local stats like CPU, Mem, Load Avg
 - Shell commands
@@ -105,6 +106,7 @@ You can also specify the location with `-f /full/path/to/sng.ini`
 **[targets]**
 - `ping=<host>` - ICMP echo (e.g., `ping=1.1.1.1`). 
 - `ping=0.0.0.0` - ICMP echo to host's default gateway IP address (resolves to read gw IP address from routing table)
+- `tcp=<host>:<port>` - TCP connect latency (e.g., `tcp=192.168.1.1:443`, also accepts `tcp=host,port`)
 - `bw=local,<interface>` - local interface throughput (e.g., `bw=local,eth0`)
 - `bw=snmp1,<host>,<community>,<ifidx>` - SNMP bandwidth (e.g., `bw=snmp1,192.168.1.1,public,7`)
 - `cpu=local` - CPU usage percentage
@@ -113,6 +115,7 @@ You can also specify the location with `-f /full/path/to/sng.ini`
 - `shell=<command>` - shell command output (e.g., `shell=ping -i 10 1.1.1.1 | sed 's/.*time=//;s/ ms//'`)
 
 **[plot name]**
+- `name` - override displayed plot name
 - `line_color`, `line_color_secondary`, `background_color` - hex RGB
 - `height` - pixels
 - `refresh_interval_sec` - seconds

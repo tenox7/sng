@@ -151,7 +151,17 @@ static int parse_type_target(const char *type, const char *target, plot_config_t
 
 static void parse_plot_config(ini_file_t *ini, plot_config_t *plot, const char *section_name) {
     char *value;
-    
+    char *newname;
+
+    if ((value = ini_get_value(ini, section_name, "name"))) {
+        newname = malloc(strlen(value) + 1);
+        if (newname) {
+            strcpy(newname, value);
+            free(plot->name);
+            plot->name = newname;
+        }
+    }
+
     if ((value = ini_get_value(ini, section_name, "line_color"))) {
         plot->line_color = parse_color(value);
     }

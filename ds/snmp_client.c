@@ -14,6 +14,15 @@ typedef int socklen_t;
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
+#if defined(__VMS)
+typedef unsigned int socklen_t;
+#elif (defined(_AIX) && !defined(_AIX43)) || defined(__osf__) || defined(__digital__)
+typedef int socklen_t;
+#endif
+#endif
+
+#ifndef INADDR_NONE
+#define INADDR_NONE 0xffffffff
 #endif
 
 #define ASN_SEQUENCE 0x30
@@ -300,11 +309,14 @@ int snmp_get_counter32(const char *host, const char *community,
                        const uint32_t *oid, int oid_len, uint32_t *result) {
     int sock;
     struct sockaddr_in addr;
+    struct sockaddr_in from;
+    socklen_t fromlen;
     unsigned char req_buf[SNMP_MAX_MSG_SIZE];
     unsigned char resp_buf[SNMP_MAX_MSG_SIZE];
     int req_len;
     int resp_len;
     struct hostent *he;
+    unsigned long addr_num;
     uint32_t req_id;
 #ifdef _WIN32
     DWORD tv_ms;
@@ -324,16 +336,23 @@ int snmp_get_counter32(const char *host, const char *community,
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 #endif
 
-    he = gethostbyname(host);
-    if (!he) {
-        close(sock);
-        return 0;
-    }
-
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(SNMP_PORT);
-    memcpy(&addr.sin_addr, he->h_addr, he->h_length);
+
+    /* numeric address first: gethostbyname can't parse dotted quads
+     * on systems without a resolver (e.g. VMS with BIND disabled) */
+    addr_num = inet_addr(host);
+    if (addr_num != INADDR_NONE) {
+        addr.sin_addr.s_addr = (uint32_t)addr_num;
+    } else {
+        he = gethostbyname(host);
+        if (!he) {
+            close(sock);
+            return 0;
+        }
+        memcpy(&addr.sin_addr, he->h_addr, he->h_length);
+    }
 
     req_id = (uint32_t)time(NULL);
     req_len = build_get_request(req_buf, community, oid, oid_len, req_id);
@@ -343,7 +362,10 @@ int snmp_get_counter32(const char *host, const char *community,
         return 0;
     }
 
-    resp_len = recvfrom(sock, resp_buf, SNMP_MAX_MSG_SIZE, 0, NULL, NULL);
+    /* VMS recvfrom returns EINVAL for NULL from/fromlen */
+    fromlen = sizeof(from);
+    resp_len = recvfrom(sock, resp_buf, SNMP_MAX_MSG_SIZE, 0,
+                        (struct sockaddr *)&from, &fromlen);
     close(sock);
 
     if (resp_len <= 0) return 0;

@@ -1,5 +1,11 @@
 #define _GNU_SOURCE
+#ifdef __VMS
+#include "graphics.h"
+#include "os/os_interface.h"
+#else
 #include "../graphics.h"
+#include "../os/os_interface.h"
+#endif
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
@@ -59,7 +65,7 @@ static float current_fps = 0.0f;
 static uint64_t x11_get_time_ms(void) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    return (uint64_t)(tv.tv_sec * 1000 + tv.tv_usec / 1000);
+    return (uint64_t)tv.tv_sec * 1000 + (uint64_t)tv.tv_usec / 1000;
 }
 
 static unsigned long x11_create_color_cached(x11_window_context_t *ctx, color_t color) {
@@ -725,7 +731,8 @@ int graphics_wait_events(void) {
         sleep_us = 1000000 / fps;
     }
 
-    usleep(sleep_us);
+    if (sleep_us < 1000) sleep_us = 1000;
+    os_sleep((uint32_t)(sleep_us / 1000));
 
     return graphics_poll_events();
 }
@@ -776,9 +783,9 @@ void graphics_draw_fps_counter(renderer_t *renderer, font_t *font, int enabled) 
     }
 
     snprintf(fps_text, sizeof(fps_text), "FPS: %.1f", current_fps);
-    fps_bg_color = (color_t){0, 0, 0, 180};
-    fps_text_color = (color_t){255, 255, 0, 255};
-    fps_bg_rect = (rect_t){5, 5, 80, 20};
+    fps_bg_color.r = 0; fps_bg_color.g = 0; fps_bg_color.b = 0; fps_bg_color.a = 180;
+    fps_text_color.r = 255; fps_text_color.g = 255; fps_text_color.b = 0; fps_text_color.a = 255;
+    fps_bg_rect.x = 5; fps_bg_rect.y = 5; fps_bg_rect.w = 80; fps_bg_rect.h = 20;
 
     renderer_set_color(renderer, fps_bg_color);
     renderer_fill_rect(renderer, fps_bg_rect);

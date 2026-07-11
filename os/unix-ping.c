@@ -21,11 +21,16 @@
 #if defined(__hpux) || defined(UNIXWARE) || defined(__osf__) || defined(__digital__) || defined(sgi) || defined(__sgi) || defined(__sun) || defined(sun)
 #include <netinet/in_systm.h>
 #endif
+#ifndef __VMS
 #include <netinet/ip.h>
+#endif
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#if (defined(_AIX) && !defined(_AIX43)) || defined(__osf__) || defined(__digital__)
+#if defined(__VMS)
+typedef unsigned int socklen_t;
+typedef unsigned int in_addr_t;
+#elif (defined(_AIX) && !defined(_AIX43)) || defined(__osf__) || defined(__digital__)
 typedef int socklen_t;
 #endif
 
@@ -145,7 +150,9 @@ int os_ping_send(os_ping_context_t *ctx, double *ping_time_ms)
     struct sockaddr_in from;
     socklen_t fromlen;
     int cc;
+#ifndef __VMS
     struct ip *ip;
+#endif
     int hlen;
     struct icmp_echo_hdr *icp;
     fd_set rfds;
@@ -201,18 +208,24 @@ int os_ping_send(os_ping_context_t *ctx, double *ping_time_ms)
 
         if (from.sin_addr.s_addr != ctx->target_addr.sin_addr.s_addr) continue;
 
+#ifdef __VMS
+        hlen = (*(u_char *)packet & 0x0f) << 2;
+#else
         ip = (struct ip *)packet;
 #if defined(__osf__) || defined(__digital__)
         hlen = (*(u_char *)packet & 0x0f) << 2;
 #else
         hlen = ip->ip_hl << 2;
 #endif
+#endif
         if (cc < hlen + ICMP_MINLEN) continue;
 
         icp = (struct icmp_echo_hdr *)(packet + hlen);
+#ifndef __VMS
         if (ip->ip_p == 0) {
             icp = (struct icmp_echo_hdr *)packet;
         }
+#endif
 
         if (icp->icmp_type == ICMP_ECHOREPLY && icp->icmp_id == ctx->id) {
             *ping_time_ms = (double)(unix_utime() - start_time) / 1000.0;

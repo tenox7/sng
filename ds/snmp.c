@@ -1,9 +1,12 @@
+#ifdef __VMS
+#include "datasource.h"
+#else
 #include "../datasource.h"
+#endif
 #include "snmp_client.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include "../compat.h"
 #include <time.h>
 
 typedef struct {

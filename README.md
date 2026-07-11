@@ -25,6 +25,7 @@ Supports multiple graphs with:
 - IRIX
 - Tru64
 - Windows/Win32
+- OpenVMS (VAX)
 
 ## Supported Graphics/UI backends
 
@@ -178,6 +179,19 @@ make macos
 ```
 nmake -f Makefile.win32
 ```
+
+### OpenVMS
+
+DECwindows X11, tested on VAX/VMS 7.3 with Compaq C V6.4:
+
+```
+$ @VMSBUILD
+```
+
+or `MMK` with the supplied `descrip.mms`. Notes: `ping=` uses a raw
+socket and needs SYSPRV; memory stats read VAX executive cells (image
+links against SYS$SYSTEM:SYS.STB); `shell=` and `loadavg=` are not
+available on VMS.
 
 ### Linux universal packages
 

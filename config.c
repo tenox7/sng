@@ -304,14 +304,14 @@ config_t *config_load(const char *filename) {
     if ((value = ini_get_value(ini, "global", "fullscreen"))) {
         if (strcmp(value, "force") == 0) {
             config->fullscreen = FULLSCREEN_FORCE;
-        } else if (strcmp(value, "1") == 0 || strcmp(value, "1") == 0) {
+        } else if (strcmp(value, "1") == 0 || strcmp(value, "true") == 0) {
             config->fullscreen = FULLSCREEN_ON;
         } else {
             config->fullscreen = FULLSCREEN_OFF;
         }
     }
     if ((value = ini_get_value(ini, "global", "fps_counter"))) {
-        config->fps_counter = (strcmp(value, "1") == 0 || strcmp(value, "1") == 0);
+        config->fps_counter = (strcmp(value, "1") == 0 || strcmp(value, "true") == 0);
     }
     if ((value = ini_get_value(ini, "global", "font_size"))) {
         if (strchr(value, 'x')) {

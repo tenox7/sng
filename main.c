@@ -15,10 +15,11 @@
 #include "ringbuf.h"
 #include "threading.h"
 
-static int running = 1;
+static volatile int running = 1;
 
+/* exit() here would run image rundown at AST level on VMS - just set a flag */
 void signal_handler(int sig) {
-    exit(0);
+    running = 0;
 }
 
 

@@ -20,7 +20,35 @@
 /* C89 compatibility definitions */
 
 /* Include system headers first to get their definitions */
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+/* VMS checks must precede __DECC: long is 32-bit on OpenVMS */
+#if defined(__VMS) && defined(__VAX)
+  /* VAX has no 64-bit integer type; uint64_t here is only 32 bits wide.
+   * All current uses are wrap-safe ms differences or small sums.
+   * Claim the inttypes.h guard: the system version typedefs int64_t as a
+   * two-int struct, which would clash with these when socket headers pull
+   * it in. */
+  #define __INTTYPES_LOADED 1
+  #include <sys/types.h>
+  typedef unsigned char uint8_t;
+  typedef unsigned short uint16_t;
+  typedef unsigned int uint32_t;
+  typedef unsigned long uint64_t;
+  typedef signed char int8_t;
+  typedef short int16_t;
+  typedef int int32_t;
+  typedef long int64_t;
+  #ifndef UINT32_MAX
+    #define UINT32_MAX 4294967295U
+  #endif
+  #ifndef INT32_MAX
+    #define INT32_MAX 2147483647
+  #endif
+  #ifndef INT32_MIN
+    #define INT32_MIN (-2147483647-1)
+  #endif
+#elif defined(__VMS)
+  #include <inttypes.h>
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
   #include <stdint.h>
 #elif defined(_AIX)
   #include <sys/types.h>
@@ -83,6 +111,13 @@
 /* Ensure UINT32_MAX is defined for all platforms */
 #ifndef UINT32_MAX
 #define UINT32_MAX 4294967295U
+#endif
+
+/* VMS CRTL gained snprintf in 7.3-2; fall back to vsprintf (unbounded) */
+#if defined(__VMS) && defined(__CRTL_VER) && (__CRTL_VER < 70312000)
+  #include <stddef.h>
+  int sng_snprintf(char *buf, size_t size, const char *fmt, ...);
+  #define snprintf sng_snprintf
 #endif
 
 /* Atomic operations - use regular types for maximum compatibility */

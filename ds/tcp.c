@@ -1,9 +1,12 @@
+#ifdef __VMS
+#include "datasource.h"
+#else
 #include "../datasource.h"
+#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
-#include "../compat.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -26,7 +29,9 @@ typedef SOCKET sock_t;
 #if defined(_AIX)
 #include <sys/select.h>
 #endif
-#if (defined(_AIX) && !defined(_AIX43)) || defined(__osf__) || defined(__digital__)
+#if defined(__VMS)
+typedef unsigned int socklen_t;
+#elif (defined(_AIX) && !defined(_AIX43)) || defined(__osf__) || defined(__digital__)
 typedef int socklen_t;
 #endif
 typedef int sock_t;

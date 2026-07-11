@@ -1,0 +1,67 @@
+$! SNG build procedure for OpenVMS (DECwindows X11)
+$! Datasources: clock, tcp, snmp, ping (raw ICMP - needs SYSPRV),
+$! cpu ($GETJPI scan), memory (VAX scheduler cells via SYS.STB).
+$! Still stubbed: loadavg, if_thr.
+$! NO_SHELL: shell ds needs select() on pipes and usleep - not on VMS.
+$!
+$! Usage: @BUILD
+$!        @BUILD CLEAN
+$!
+$ ON ERROR THEN GOTO ERROR
+$ SAY := WRITE SYS$OUTPUT
+$! Run from the procedure's own directory (rsh lands in SYS$LOGIN)
+$ PROC = F$ENVIRONMENT("PROCEDURE")
+$ SET DEFAULT 'F$PARSE(PROC,,,"DEVICE","SYNTAX_ONLY")''F$PARSE(PROC,,,"DIRECTORY","SYNTAX_ONLY")'
+$ IF P1 .EQS. "CLEAN" THEN GOTO CLEAN
+$!
+$! Make #include <X11/...> resolve to the DECwindows headers
+$ IF F$TRNLNM("X11") .EQS. "" THEN DEFINE/NOLOG X11 DECW$INCLUDE
+$!
+$ CFLAGS = "/DEFINE=(GFX_X11,NO_SHELL)" + -
+           "/INCLUDE_DIRECTORY=[]" + -
+           "/NESTED_INCLUDE_DIRECTORY=INCLUDE_FILE" + -
+           "/NAMES=(UPPERCASE,SHORTENED)"
+$!
+$ SAY "Compiling..."
+$ CC 'CFLAGS' MAIN.C
+$ CC 'CFLAGS' GRAPHICS.C
+$ CC 'CFLAGS' CONFIG.C
+$ CC 'CFLAGS' PLOT.C
+$ CC 'CFLAGS' RINGBUF.C
+$ CC 'CFLAGS' THREADING.C
+$ CC 'CFLAGS' INI_PARSER.C
+$ CC 'CFLAGS' DATASOURCE.C
+$ CC 'CFLAGS' [.DS]CLOCK.C /OBJECT=CLOCK.OBJ
+$ CC 'CFLAGS' [.DS]TCP.C /OBJECT=TCP.OBJ
+$ CC 'CFLAGS' [.DS]SNMP.C /OBJECT=SNMP.OBJ
+$ CC 'CFLAGS' [.DS]SNMP_CLIENT.C /OBJECT=SNMP_CLIENT.OBJ
+$ CC 'CFLAGS' [.DS]PING.C /OBJECT=PING.OBJ
+$ CC 'CFLAGS' [.DS]CPU.C /OBJECT=CPU.OBJ
+$ CC 'CFLAGS' [.DS]MEMORY.C /OBJECT=MEMORY.OBJ
+$ CC 'CFLAGS' [.DS]LOADAVG.C /OBJECT=LOADAVG.OBJ
+$ CC 'CFLAGS' [.DS]IF_THR.C /OBJECT=IF_THR.OBJ
+$ CC 'CFLAGS' [.OS]OS.C /OBJECT=OS.OBJ
+$!
+$ SAY "Linking..."
+$ LINK /EXECUTABLE=SNG.EXE -
+    MAIN.OBJ, GRAPHICS.OBJ, CONFIG.OBJ, PLOT.OBJ, RINGBUF.OBJ, -
+    THREADING.OBJ, INI_PARSER.OBJ, DATASOURCE.OBJ, CLOCK.OBJ, -
+    TCP.OBJ, SNMP.OBJ, SNMP_CLIENT.OBJ, PING.OBJ, CPU.OBJ, -
+    MEMORY.OBJ, LOADAVG.OBJ, IF_THR.OBJ, OS.OBJ, -
+    SNG.OPT/OPTIONS
+$! Linker reports undefined symbols as warnings and still writes the image
+$ IF .NOT. $STATUS THEN GOTO ERROR
+$!
+$ SAY "Build complete: SNG.EXE"
+$ SAY "Run with:  MCR SYS$DISK:[]SNG.EXE"
+$ EXIT
+$!
+$ CLEAN:
+$ IF F$SEARCH("*.OBJ") .NES. "" THEN DELETE/NOCONFIRM *.OBJ;*
+$ IF F$SEARCH("SNG.EXE") .NES. "" THEN DELETE/NOCONFIRM SNG.EXE;*
+$ SAY "Clean complete"
+$ EXIT
+$!
+$ ERROR:
+$ SAY "Build failed"
+$ EXIT %X10000004

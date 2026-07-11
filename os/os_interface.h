@@ -1,7 +1,11 @@
 #ifndef OS_INTERFACE_H
 #define OS_INTERFACE_H
 
+#ifdef __VMS
+#include "compat.h"  /* DEC C can't resolve "../" includes, uses /INCLUDE=[] */
+#else
 #include "../compat.h"
+#endif
 #include <stddef.h>
 
 typedef struct plot_mutex_t plot_mutex_t;

@@ -1,7 +1,11 @@
 #ifndef SNMP_CLIENT_H
 #define SNMP_CLIENT_H
 
+#ifdef __VMS
+#include "compat.h"
+#else
 #include "../compat.h"
+#endif
 
 #define SNMP_PORT 161
 #define SNMP_MAX_MSG_SIZE 1500

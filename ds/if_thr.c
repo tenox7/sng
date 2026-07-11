@@ -1,11 +1,15 @@
 #define _GNU_SOURCE
+#ifdef __VMS
+#include "datasource.h"
+#include "os/os_interface.h"
+#else
 #include "../datasource.h"
 #include "../os/os_interface.h"
+#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
-#include "../compat.h"
 
 typedef struct {
     char *interface_name;

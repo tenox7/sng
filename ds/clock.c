@@ -1,4 +1,8 @@
+#ifdef __VMS
+#include "datasource.h"
+#else
 #include "../datasource.h"
+#endif
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>

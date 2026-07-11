@@ -1,8 +1,12 @@
+#ifdef __VMS
+#include "datasource.h"
+#include "os/os_interface.h"
+#else
 #include "../datasource.h"
 #include "../os/os_interface.h"
+#endif
 #include <stddef.h>
 #include <stdlib.h>
-#include "../compat.h"
 #include <stdio.h>
 
 typedef struct {

@@ -20,6 +20,22 @@ static const char *DEFAULT_CONFIG_HEAD =
 "\n"
 "[targets]\n";
 
+#ifdef DS_MINIMAL
+static const char *DEFAULT_CONFIG_DEFGW = "";
+
+static const char *DEFAULT_CONFIG_TAIL =
+"clock=24\n";
+#elif defined(__VMS)
+/* loadavg needs the VMS os layer, not implemented yet */
+static const char *DEFAULT_CONFIG_DEFGW = "";
+
+static const char *DEFAULT_CONFIG_TAIL =
+"ping=1.1.1.1\n"
+"tcp=1.1.1.1:443\n"
+"cpu=local\n"
+"memory=local\n"
+"clock=24\n";
+#else
 static const char *DEFAULT_CONFIG_DEFGW = "ping=0.0.0.0\n";
 
 static const char *DEFAULT_CONFIG_TAIL =
@@ -27,5 +43,6 @@ static const char *DEFAULT_CONFIG_TAIL =
 "ping=8.8.8.8\n"
 "cpu=local\n"
 "loadavg=local\n";
+#endif
 
 #endif

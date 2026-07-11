@@ -4,6 +4,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef DS_MINIMAL
+extern datasource_handler_t clock_handler;
+
+static datasource_handler_t *handlers[] = {
+    &clock_handler,
+    NULL
+};
+#else
 extern datasource_handler_t ping_handler;
 extern datasource_handler_t tcp_handler;
 extern datasource_handler_t cpu_handler;
@@ -30,6 +38,7 @@ static datasource_handler_t *handlers[] = {
     &clock_handler,
     NULL
 };
+#endif /* DS_MINIMAL */
 
 datasource_t *datasource_create(const char *type, const char *target) {
     int i;
@@ -94,7 +103,7 @@ double datasource_get_max_scale(datasource_t *ds) {
 
 void datasource_set_refresh_interval(datasource_t *ds, int32_t refresh_interval_ms) {
     if (!ds || !ds->handler) return;
-#ifndef NO_SHELL
+#if !defined(NO_SHELL) && !defined(DS_MINIMAL)
     if (ds->handler == &shell_handler) {
         extern void shell_set_refresh_interval(void *context, int32_t refresh_interval_ms);
         shell_set_refresh_interval(ds->context, refresh_interval_ms);

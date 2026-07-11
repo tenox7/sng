@@ -25,7 +25,7 @@ Supports multiple graphs with:
 - IRIX
 - Tru64
 - Windows/Win32
-- OpenVMS (VAX)
+- OpenVMS
 
 ## Supported Graphics/UI backends
 
@@ -123,7 +123,7 @@ You can also specify the location with `-f /full/path/to/sng.ini`
 
 ## Performance Considerations
 
-This app is meant to be running in background and its optimized to consume as little resources as possible rather than be a "fast and responsive UI".
+This app is meant to be running in background and its optimized to consume as little resources as possible rather than be a "fast and responsive UI". As such it may feel little slow or laggy when interacting with it - but thats to save resources.
 
 SNG supports many UI/Graphics backends. Not all of them behave nicely. If you care about low CPU usage, wasted cycles, power usage - prefer GFX=X11, then GTK3. Avoid SDL - it's not a GUI framework but a multimedia/game library designed for high performance.  It's pretty hard to make it yeld CPU back. SDL will use more CPU cycles on idle.
 

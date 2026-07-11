@@ -23,6 +23,10 @@ solaris:
 hpux:
 	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11" LDFLAGS="-L/usr/lib/X11R6 -lX11 -lpthread -lm -lnm"
 
+# 10.20 has no pthreads and no NMAPI: gcc -threads gives DCE/CMA (-lcma -lc_r)
+hpux10:
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -DHPUX10 -threads -include os/hpux10.h" LDFLAGS="-L/usr/lib/X11R6 -lX11 -lm -threads"
+
 aix:
 	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -pthread" LDFLAGS="-lX11 -pthread -lm"
 
@@ -41,4 +45,4 @@ clean:
 install: $(TARGET)
 	cp $(TARGET) /usr/local/bin/
 
-.PHONY: all clean install linux solaris hpux aix unixware osf1 irix
+.PHONY: all clean install linux solaris hpux hpux10 aix unixware osf1 irix

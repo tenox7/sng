@@ -16,7 +16,7 @@ typedef int socklen_t;
 #include <unistd.h>
 #if defined(__VMS)
 typedef unsigned int socklen_t;
-#elif (defined(_AIX) && !defined(_AIX43)) || defined(__osf__) || defined(__digital__)
+#elif (defined(_AIX) && !defined(_AIX43)) || defined(__osf__) || defined(__digital__) || defined(__hpux)
 typedef int socklen_t;
 #endif
 #endif

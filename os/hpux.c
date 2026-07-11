@@ -8,8 +8,6 @@ struct plot_thread_t {
     void *handle;
 };
 #include <sys/pstat.h>
-#include <sys/mib.h>
-#include <netinet/mib_kern.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -18,8 +16,14 @@ struct plot_thread_t {
 #include <stdlib.h>
 #include <sys/time.h>
 #include <time.h>
-#include <pthread.h>
 #include <stdio.h>
+#ifdef HPUX10
+#include "hpux10.h"
+#else
+#include <sys/mib.h>
+#include <netinet/mib_kern.h>
+#include <pthread.h>
+#endif
 
 const char* os_get_platform_name(void) {
     return "hpux";
@@ -149,6 +153,75 @@ int os_loadavg_get_stats(double *value) {
     return 1;
 }
 
+#ifdef HPUX10
+
+/* 10.20 predates the NMAPI and its struct ifnet has no byte counters, so
+ * lanadmin's menu is the only source of octet counts. It costs a fork per
+ * sample, which stalls the other CMA threads for its duration. */
+int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint32_t* out_bytes) {
+    char cmd[192], line[256];
+    const char *ppa;
+    char *eq;
+    FILE *fp;
+    int matched, got;
+
+    if (!interface_name || !in_bytes || !out_bytes) return 0;
+
+    for (ppa = interface_name; *ppa && (*ppa < '0' || *ppa > '9'); ppa++);
+    if (!*ppa) return 0;
+
+    snprintf(cmd, sizeof(cmd),
+             "/usr/sbin/lanadmin -t 2>/dev/null <<EOF\nlan\nppa %d\ndisplay\nquit\nEOF\n",
+             atoi(ppa));
+
+    fp = popen(cmd, "r");
+    if (!fp) return 0;
+
+    matched = 0;
+    got = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        eq = strchr(line, '=');
+        if (!eq) continue;
+        if (strncmp(line, "Description", 11) == 0) {
+            matched = strstr(eq, interface_name) != NULL;
+        } else if (strncmp(line, "Inbound Octets", 14) == 0) {
+            *in_bytes = (uint32_t)strtoul(eq + 1, NULL, 10);
+            got |= 1;
+        } else if (strncmp(line, "Outbound Octets", 15) == 0) {
+            *out_bytes = (uint32_t)strtoul(eq + 1, NULL, 10);
+            got |= 2;
+        }
+    }
+    pclose(fp);
+
+    return matched && got == 3;
+}
+
+int os_get_default_gw_ip(char *buf, size_t buflen) {
+    char line[256], dest[64], gw[64];
+    FILE *fp;
+    int found;
+
+    if (!buf || buflen < 16) return 0;
+
+    fp = popen("/usr/bin/netstat -rn 2>/dev/null", "r");
+    if (!fp) return 0;
+
+    found = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        if (sscanf(line, "%63s %63s", dest, gw) != 2) continue;
+        if (strcmp(dest, "default") != 0 && strcmp(dest, "0.0.0.0") != 0) continue;
+        snprintf(buf, buflen, "%s", gw);
+        found = 1;
+        break;
+    }
+    pclose(fp);
+
+    return found;
+}
+
+#else
+
 int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint32_t* out_bytes) {
     static nmapi_phystat *if_list = NULL;
     static int if_count = 0;
@@ -203,6 +276,8 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
     return 0;
 }
 
+#endif /* HPUX10 */
+
 void os_sleep(uint32_t milliseconds) {
     struct timespec ts;
 
@@ -231,7 +306,11 @@ plot_mutex_t *os_plot_mutex_create(void) {
         return NULL;
     }
 
+#ifdef HPUX10
+    ret = pthread_mutex_init((pthread_mutex_t*)mutex->handle, pthread_mutexattr_default);
+#else
     ret = pthread_mutex_init((pthread_mutex_t*)mutex->handle, NULL);
+#endif
     if (ret != 0) {
         free(mutex->handle);
         free(mutex);
@@ -274,7 +353,11 @@ plot_thread_t *os_plot_thread_create(void (*func)(void *), void *arg) {
         return NULL;
     }
 
+#ifdef HPUX10
+    ret = pthread_create((pthread_t*)thread->handle, pthread_attr_default, (pthread_startroutine_t)func, arg);
+#else
     ret = pthread_create((pthread_t*)thread->handle, NULL, (void*(*)(void*))func, arg);
+#endif
     if (ret != 0) {
         free(thread->handle);
         free(thread);
@@ -309,6 +392,8 @@ int os_plot_thread_join_timeout(plot_thread_t *thread, uint32_t timeout_ms) {
 char *os_get_config_path(const char *filename) {
     return (char *)filename;
 }
+
+#ifndef HPUX10
 
 int os_get_default_gw_ip(char *buf, size_t buflen) {
     int fd, count, i;
@@ -356,5 +441,12 @@ int os_get_default_gw_ip(char *buf, size_t buflen) {
     close_mib(fd);
     return found;
 }
+
+#endif /* !HPUX10 */
+
 #include "unix-ping.c"
+#ifdef HPUX10
+#include "cma_timer.c"
+#else
 #include "posix_timer.c"
+#endif

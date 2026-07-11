@@ -26,7 +26,6 @@
 
 - OpenServer/OpenDesktop
 - NextStep/OpenStep
-- OpenVMS
 - Plan9
 - RiscOS
 - QNX6 / QNX4

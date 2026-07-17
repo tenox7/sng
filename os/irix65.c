@@ -1,7 +1,9 @@
 #define _KMEMUSER
 
 #include "os_interface.h"
+#ifndef IRIX5
 #include "unix-defgw.c"
+#endif
 
 struct plot_mutex_t {
     void *handle;
@@ -20,13 +22,50 @@ struct plot_thread_t {
 #include <stdio.h>
 #include <time.h>
 #include <sys/time.h>
+#ifdef IRIX5
+#include <sys/prctl.h>
+#include <sys/wait.h>
+#include <abi_mutex.h>
+#else
 #include <pthread.h>
+#endif
 #include <stdlib.h>
 #include <sys/socket.h>
+#ifndef IRIX5
 #include <sys/sysctl.h>
 #include <net/if.h>
 #include <net/route.h>
 #include <net/if_dl.h>
+#endif
+
+#ifdef IRIX5
+/*
+ * 5.3 libc predates snprintf and usleep. Supply real symbols (not compat.h
+ * macros) over vsprintf/nanosleep: gfx/x11.c and others call these without
+ * including compat.h, so only an actual definition resolves every reference.
+ * Neither has a 5.3 prototype, so there is nothing to collide with.
+ *
+ * Use gcc's varargs builtins, not <stdarg.h>: -isystem /usr/include shadows
+ * gcc's copy with IRIX's, which uses __builtin_alignof that gcc 4.5 lacks.
+ */
+int snprintf(char *buf, size_t size, const char *fmt, ...) {
+    __builtin_va_list ap;
+    int n;
+    (void)size;
+    __builtin_va_start(ap, fmt);
+    n = vsprintf(buf, fmt, ap);
+    __builtin_va_end(ap);
+    return n;
+}
+
+int usleep(unsigned int usec) {
+    struct timespec ts;
+    ts.tv_sec = usec / 1000000;
+    ts.tv_nsec = (usec % 1000000) * 1000;
+    nanosleep(&ts, NULL);
+    return 0;
+}
+#endif
 
 #define UNIX "/unix"
 #define KMEM "/dev/kmem"
@@ -229,6 +268,46 @@ int os_loadavg_get_stats(double *value) {
     return 1;
 }
 
+#ifdef IRIX5
+
+/* 5.3 predates the sysctl(3) route dump. netstat is the only view of the
+ * routing table that does not mean walking the radix tree through /dev/kmem;
+ * the hpux 10.20 branch takes the same way out. */
+int os_get_default_gw_ip(char *buf, size_t buflen) {
+    char line[256], dest[64], gw[64];
+    FILE *fp;
+    int found;
+
+    if (!buf || buflen < 16) return 0;
+
+    fp = popen("/usr/etc/netstat -rn 2>/dev/null", "r");
+    if (!fp) return 0;
+
+    found = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        if (sscanf(line, "%63s %63s", dest, gw) != 2) continue;
+        if (strcmp(dest, "default") != 0 && strcmp(dest, "0.0.0.0") != 0) continue;
+        snprintf(buf, buflen, "%s", gw);
+        found = 1;
+        break;
+    }
+    pclose(fp);
+
+    return found;
+}
+
+/* NET_RT_IFLIST has no 5.3 equivalent: the byte counters live in the kernel
+ * ifnet chain, reachable only through /dev/kmem. Until that is written,
+ * bw=local reports nothing here; bw=snmp1 against the host still works. */
+int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint32_t* out_bytes) {
+    (void)interface_name;
+    (void)in_bytes;
+    (void)out_bytes;
+    return 0;
+}
+
+#else
+
 int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint32_t* out_bytes) {
     static char *buf = NULL;
     static size_t buf_size = 0;
@@ -286,6 +365,8 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
     return 0;
 }
 
+#endif /* IRIX5 */
+
 void os_sleep(uint32_t milliseconds) {
     struct timespec ts;
 
@@ -300,6 +381,97 @@ uint32_t os_get_time_ms(void) {
     gettimeofday(&tv, NULL);
     return (uint32_t)(tv.tv_sec * 1000 + tv.tv_usec / 1000);
 }
+
+#ifdef IRIX5
+
+/*
+ * 5.3 has no pthreads. sproc(PR_SADDR) forks a process that shares the whole
+ * address space, so globals, heap, and the abilock below are common to every
+ * collector; PR_SFDS shares the fd table too. abi_mutex is a bare test-and-set
+ * spinlock, which is all ringbuf's sub-microsecond critical sections need.
+ */
+
+plot_mutex_t *os_plot_mutex_create(void) {
+    plot_mutex_t *mutex;
+
+    mutex = malloc(sizeof(plot_mutex_t));
+    if (!mutex) return NULL;
+
+    mutex->handle = malloc(sizeof(abilock_t));
+    if (!mutex->handle) {
+        free(mutex);
+        return NULL;
+    }
+
+    init_lock((abilock_t*)mutex->handle);
+    return mutex;
+}
+
+void os_plot_mutex_destroy(plot_mutex_t *mutex) {
+    if (!mutex) return;
+
+    free(mutex->handle);
+    free(mutex);
+}
+
+void os_plot_mutex_lock(plot_mutex_t *mutex) {
+    if (!mutex) return;
+
+    spin_lock((abilock_t*)mutex->handle);
+}
+
+void os_plot_mutex_unlock(plot_mutex_t *mutex) {
+    if (!mutex) return;
+
+    release_lock((abilock_t*)mutex->handle);
+}
+
+plot_thread_t *os_plot_thread_create(void (*func)(void *), void *arg) {
+    plot_thread_t *thread;
+    int pid;
+
+    thread = malloc(sizeof(plot_thread_t));
+    if (!thread) return NULL;
+
+    thread->handle = malloc(sizeof(int));
+    if (!thread->handle) {
+        free(thread);
+        return NULL;
+    }
+
+    pid = sproc(func, PR_SADDR | PR_SFDS, arg);
+    if (pid < 0) {
+        free(thread->handle);
+        free(thread);
+        return NULL;
+    }
+
+    *(int*)thread->handle = pid;
+    return thread;
+}
+
+void os_plot_thread_destroy(plot_thread_t *thread) {
+    if (!thread) return;
+
+    free(thread->handle);
+    free(thread);
+}
+
+void os_plot_thread_join(plot_thread_t *thread) {
+    if (!thread) return;
+
+    waitpid(*(int*)thread->handle, NULL, 0);
+}
+
+int os_plot_thread_join_timeout(plot_thread_t *thread, uint32_t timeout_ms) {
+    (void)timeout_ms;
+
+    if (!thread) return 0;
+
+    return waitpid(*(int*)thread->handle, NULL, 0) >= 0;
+}
+
+#else
 
 plot_mutex_t *os_plot_mutex_create(void) {
     plot_mutex_t *mutex;
@@ -389,9 +561,15 @@ int os_plot_thread_join_timeout(plot_thread_t *thread, uint32_t timeout_ms) {
     return (result == 0);
 }
 
+#endif /* IRIX5 */
+
 char *os_get_config_path(const char *filename) {
     return (char *)filename;
 }
 
 #include "unix-ping.c"
+#ifdef IRIX5
+#include "sproc_timer.c"
+#else
 #include "posix_timer.c"
+#endif

@@ -31,7 +31,7 @@ typedef SOCKET sock_t;
 #endif
 #if defined(__VMS)
 typedef unsigned int socklen_t;
-#elif (defined(_AIX) && !defined(_AIX43)) || defined(__osf__) || defined(__digital__) || defined(__hpux)
+#elif (defined(_AIX) && !defined(_AIX43)) || defined(__osf__) || defined(__digital__) || defined(__hpux) || defined(IRIX5)
 typedef int socklen_t;
 #endif
 typedef int sock_t;

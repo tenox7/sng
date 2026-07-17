@@ -39,10 +39,29 @@ osf1:
 irix:
 	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -isystem /usr/include -D__STDINT_H__" LDFLAGS="-lX11 -lpthread -lelf"
 
+# 5.3 predates socklen_t (sgi alone cannot gate it, 6.5 defines the type) and
+# has no pthreads: sproc + abi_mutex instead, so no -lpthread.
+#
+# tgcware gcc45 is built --with-gnu-as --without-gnu-ld --with-ld=/usr/bin/ld,
+# but the 5.3 native ld chokes on gas 2.22's .mdebug header ("bad symbolic
+# header") even in gcc's own crti. collect2 emits native-ld flag syntax, so gcc
+# cannot drive GNU ld either. Fix: compile with gcc, link with tgcware GNU ld
+# directly, supplying the crt objects and gcc runtime libs by hand.
+IRIX5_GCCLIB = /usr/tgcware/gcc45/lib/gcc/mips-sgi-irix5.3/4.5.3
+IRIX5_LD = /usr/tgcware/mips-sgi-irix5.3/bin/ld
+
+irix5:
+	$(MAKE) -f Makefile.x11 $(OBJECTS) CFLAGS="-g -DGFX_X11 -DIRIX5 -isystem /usr/include -D__STDINT_H__"
+	$(IRIX5_LD) -o $(TARGET) -init __gcc_init -fini __gcc_fini \
+	  /usr/lib/crt1.o $(IRIX5_GCCLIB)/irix-crti.o $(IRIX5_GCCLIB)/crtbegin.o \
+	  -L$(IRIX5_GCCLIB) -L$(IRIX5_GCCLIB)/../../.. -L/usr/lib \
+	  $(OBJECTS) -lX11 -lmld -lgcc -lgcc_eh -lc \
+	  $(IRIX5_GCCLIB)/crtend.o $(IRIX5_GCCLIB)/irix-crtn.o /usr/lib/crtn.o
+
 clean:
 	rm -f *.o */*.o $(TARGET)
 
 install: $(TARGET)
 	cp $(TARGET) /usr/local/bin/
 
-.PHONY: all clean install linux solaris hpux hpux10 aix unixware osf1 irix
+.PHONY: all clean install linux solaris hpux hpux10 aix unixware osf1 irix irix5

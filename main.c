@@ -14,6 +14,7 @@
 #include "plot.h"
 #include "ringbuf.h"
 #include "threading.h"
+#include "httpd.h"
 
 static volatile int running = 1;
 
@@ -30,9 +31,13 @@ int main(int argc, char *argv[]) {
     config_t *config;
     plot_system_t *plot_system;
     data_collector_t *data_collector;
+    int http_flag;
+    int http_port;
 
     config_file = "sng.ini";
     frame_count = 0;
+    http_flag = 0;
+    http_port = 0;
 
     for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0) {
@@ -41,8 +46,14 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
             config_file = argv[i + 1];
             i++;
+        } else if (strcmp(argv[i], "-w") == 0) {
+            http_flag = 1;
+            if (i + 1 < argc && atoi(argv[i + 1]) > 0) {
+                http_port = atoi(argv[i + 1]);
+                i++;
+            }
         } else {
-            fprintf(stderr, "Usage: %s [-v] [-f config_file]\n", argv[0]);
+            fprintf(stderr, "Usage: %s [-v] [-f config_file] [-w [port]]\n", argv[0]);
             return 1;
         }
     }
@@ -69,6 +80,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+
+    if (http_flag) config->http_enabled = 1;
+    if (http_port > 0 && http_port <= 65535) config->http_port = http_port;
 
     plot_system = plot_system_create(config);
     if (!plot_system) {
@@ -102,6 +116,18 @@ int main(int argc, char *argv[]) {
     }
     
 
+    if (config->http_enabled) {
+        if (!httpd_start(config, data_collector)) {
+            fprintf(stderr, "Failed to start HTTP server\n");
+            data_collector_destroy(data_collector);
+            plot_system_destroy(plot_system);
+            config_destroy(config);
+            graphics_cleanup();
+            os_cleanup();
+            return 1;
+        }
+    }
+
     graphics_start_render_timer(config->max_fps);
 
     while (running) {
@@ -115,6 +141,7 @@ int main(int argc, char *argv[]) {
 
     }
 
+    httpd_stop();
     graphics_stop_render_timer();
     graphics_cleanup();
     os_cleanup();

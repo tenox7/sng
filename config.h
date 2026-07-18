@@ -37,6 +37,8 @@ typedef struct {
     int fps_counter;
     float font_size;
     char *font_name;
+    int http_enabled;
+    int32_t http_port;
 
     plot_config_t *plots;
     uint32_t plot_count;

@@ -17,6 +17,8 @@ static const char *DEFAULT_CONFIG_HEAD =
 "fullscreen=false\n"
 "fps_counter=false\n"
 "font_size=1.0\n"
+"#http_server=true\n"
+"#http_port=8080\n"
 "\n"
 "[targets]\n";
 

@@ -265,6 +265,8 @@ config_t *config_load(const char *filename) {
     config->fps_counter = 0;
     config->font_size = 1.0f;
     config->font_name = NULL;
+    config->http_enabled = 0;
+    config->http_port = 8080;
     config->plots = NULL;
     config->plot_count = 0;
     
@@ -308,6 +310,15 @@ config_t *config_load(const char *filename) {
             config->fullscreen = FULLSCREEN_ON;
         } else {
             config->fullscreen = FULLSCREEN_OFF;
+        }
+    }
+    if ((value = ini_get_value(ini, "global", "http_server"))) {
+        config->http_enabled = (strcmp(value, "1") == 0 || strcmp(value, "true") == 0);
+    }
+    if ((value = ini_get_value(ini, "global", "http_port"))) {
+        int port = atoi(value);
+        if (port > 0 && port <= 65535) {
+            config->http_port = port;
         }
     }
     if ((value = ini_get_value(ini, "global", "fps_counter"))) {

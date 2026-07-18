@@ -103,6 +103,8 @@ You can also specify the location with `-f /full/path/to/sng.ini`
 - `fps_counter` - `0`, `1`
 - `font_size` - float or font name
 - `font_name` - font family name
+- `http_server` - `true`, `false` - serve charts over HTTP as a GIF image on an auto-refreshing HTML page (default off; can also be enabled with the `-w [port]` command line flag)
+- `http_port` - HTTP server TCP port (default `8080`)
 
 **[targets]**
 - `ping=<host>` - ICMP echo (e.g., `ping=1.1.1.1`). 

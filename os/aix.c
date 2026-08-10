@@ -22,6 +22,64 @@ struct plot_thread_t {
 
 int snprintf(char *, size_t, const char *, ...);
 
+/* 4.1 predates libperfstat, so every statistic is read out of /dev/kmem at an
+ * address resolved with knlist(). */
+static int kmem_fd = -1;
+
+static unsigned long kmem_symbol(const char *name) {
+    struct nlist nl[2];
+
+    memset(nl, 0, sizeof(nl));
+    nl[0].n_name = (char *)name;
+    nl[1].n_name = NULL;
+
+    if (knlist(nl, 1, sizeof(struct nlist)) != 0)
+        return 0;
+
+    return nl[0].n_value;
+}
+
+static int kmem_read(unsigned long addr, void *buf, int size) {
+    int upper_2gb = 0;
+
+    if (addr == 0)
+        return 0;
+
+    if (kmem_fd < 0) {
+        kmem_fd = open("/dev/kmem", O_RDONLY);
+        if (kmem_fd < 0)
+            return 0;
+    }
+
+    /* addresses above 2GB are reached by seeking to addr % 2GB and passing 1
+     * as the extension argument of readx(), see the kmem(4) man page */
+    if (addr > 0x7fffffff) {
+        upper_2gb = 1;
+        addr &= 0x7fffffff;
+    }
+
+    if (lseek(kmem_fd, addr, SEEK_SET) == -1)
+        return 0;
+
+    return readx(kmem_fd, buf, size, upper_2gb) == size;
+}
+
+/* The kernel publishes its virtual memory counters through the "vmker"
+ * symbol, for which AIX ships no header.  This layout was reverse engineered
+ * by Jussi Maki for "monitor" and is the same one the AIX 4.1 module of
+ * top(1) uses; numperm is named after vmtune.c.  Verified on 4.1.5: totalmem
+ * matches "lsattr -El sys0 -a realmem" and freemem tracks vmstat's fre. */
+struct vmker {
+    unsigned int n0, n1, n2, n3, n4, n5, n6, n7, n8;
+    unsigned int totalmem;              /* real memory frames */
+    unsigned int badmem;                /* unusable frames */
+    unsigned int freemem;               /* free real memory frames */
+    unsigned int n12;
+    unsigned int numperm;               /* persistent (file cache) pages */
+    unsigned int totalvmem, freevmem;   /* paging space frames */
+    unsigned int n16, n17, n18, n19, n20;
+};
+
 const char* os_get_platform_name(void) {
     return "aix";
 }
@@ -36,46 +94,19 @@ void os_cleanup(void) {
 int os_cpu_get_stats(double *value) {
     static uint64_t prev_idle = 0;
     static uint64_t prev_total = 0;
-    static int kmem_fd = -1;
     static unsigned long sysinfo_addr = 0;
     static int first_time = 1;
     struct sysinfo s_info;
     uint64_t user, sys, wait, idle;
     uint64_t total_ticks;
     uint64_t idle_diff, total_diff;
-    unsigned long offset;
-    int upper_2gb;
 
     if (first_time) {
-        struct nlist nl[2];
-        nl[0].n_name = "sysinfo";
-        nl[0].n_value = 0;
-        nl[1].n_name = NULL;
-        nl[1].n_value = 0;
-
-        if (knlist(nl, 1, sizeof(struct nlist)) == 0 && nl[0].n_value != 0) {
-            sysinfo_addr = nl[0].n_value;
-            kmem_fd = open("/dev/kmem", O_RDONLY);
-        }
+        sysinfo_addr = kmem_symbol("sysinfo");
         first_time = 0;
     }
 
-    if (kmem_fd < 0 || sysinfo_addr == 0) {
-        return 0;
-    }
-
-    offset = sysinfo_addr;
-    upper_2gb = 0;
-    if (offset > (1U << 31)) {
-        upper_2gb = 1;
-        offset &= 0x7fffffff;
-    }
-
-    if (lseek(kmem_fd, offset, SEEK_SET) == -1) {
-        return 0;
-    }
-
-    if (readx(kmem_fd, &s_info, sizeof(s_info), upper_2gb) != sizeof(s_info)) {
+    if (!kmem_read(sysinfo_addr, &s_info, sizeof(s_info))) {
         return 0;
     }
 
@@ -106,46 +137,19 @@ int os_cpu_get_stats_dual(double *total_value, double *system_value) {
     static uint64_t prev_idle = 0;
     static uint64_t prev_total = 0;
     static uint64_t prev_system = 0;
-    static int kmem_fd = -1;
     static unsigned long sysinfo_addr = 0;
     static int first_time = 1;
     struct sysinfo s_info;
     uint64_t user, sys, wait, idle;
     uint64_t total_ticks, system_ticks;
     uint64_t idle_diff, total_diff, system_diff;
-    unsigned long offset;
-    int upper_2gb;
 
     if (first_time) {
-        struct nlist nl[2];
-        nl[0].n_name = "sysinfo";
-        nl[0].n_value = 0;
-        nl[1].n_name = NULL;
-        nl[1].n_value = 0;
-
-        if (knlist(nl, 1, sizeof(struct nlist)) == 0 && nl[0].n_value != 0) {
-            sysinfo_addr = nl[0].n_value;
-            kmem_fd = open("/dev/kmem", O_RDONLY);
-        }
+        sysinfo_addr = kmem_symbol("sysinfo");
         first_time = 0;
     }
 
-    if (kmem_fd < 0 || sysinfo_addr == 0) {
-        return 0;
-    }
-
-    offset = sysinfo_addr;
-    upper_2gb = 0;
-    if (offset > (1U << 31)) {
-        upper_2gb = 1;
-        offset &= 0x7fffffff;
-    }
-
-    if (lseek(kmem_fd, offset, SEEK_SET) == -1) {
-        return 0;
-    }
-
-    if (readx(kmem_fd, &s_info, sizeof(s_info), upper_2gb) != sizeof(s_info)) {
+    if (!kmem_read(sysinfo_addr, &s_info, sizeof(s_info))) {
         return 0;
     }
 
@@ -181,57 +185,58 @@ int os_cpu_get_stats_dual(double *total_value, double *system_value) {
 }
 
 int os_memory_get_stats(double *value) {
-    return 0;
-}
-
-int os_loadavg_get_stats(double *value) {
-    static int kmem_fd = -1;
-    static unsigned long load_avg_addr = 0;
+    static unsigned long vmker_addr = 0;
+    static long pagesize = 0;
     static int first_time = 1;
-    int load_avg[3];
-    unsigned long offset;
-    int upper_2gb;
+    struct vmker vmk;
+    uint64_t total_memory, free_memory, used_memory;
 
     if (first_time) {
-        struct nlist nl[2];
-        nl[0].n_name = "avenrun";
-        nl[0].n_value = 0;
-        nl[1].n_name = NULL;
-        nl[1].n_value = 0;
-
-        if (knlist(nl, 1, sizeof(struct nlist)) == 0 && nl[0].n_value != 0) {
-            load_avg_addr = nl[0].n_value;
-            kmem_fd = open("/dev/kmem", O_RDONLY);
-        }
+        vmker_addr = kmem_symbol("vmker");
+        pagesize = getpagesize();
         first_time = 0;
     }
 
-    if (kmem_fd >= 0 && load_avg_addr != 0) {
-        offset = load_avg_addr;
-        upper_2gb = 0;
-        if (offset > (1U << 31)) {
-            upper_2gb = 1;
-            offset &= 0x7fffffff;
-        }
+    if (!kmem_read(vmker_addr, &vmk, sizeof(vmk)))
+        return 0;
 
-        if (lseek(kmem_fd, offset, SEEK_SET) != -1 &&
-            readx(kmem_fd, load_avg, sizeof(load_avg), upper_2gb) == sizeof(load_avg)) {
-            *value = (double)load_avg[0] / 65536.0;
-        } else {
-            *value = 0.0;
-        }
-    } else {
-        *value = 0.0;
+    total_memory = (uint64_t)vmk.totalmem * pagesize;
+    if (total_memory == 0) return 0;
+
+    /* numperm is the file cache, which the kernel hands back under pressure,
+     * so count it as available rather than used */
+    free_memory = ((uint64_t)vmk.freemem + (uint64_t)vmk.numperm) * pagesize;
+    used_memory = total_memory > free_memory ? total_memory - free_memory : 0;
+    *value = (double)used_memory / (double)total_memory * 100.0;
+
+    if (*value > 100.0) *value = 100.0;
+    if (*value < 0.0) *value = 0.0;
+
+    return 1;
+}
+
+int os_loadavg_get_stats(double *value) {
+    static unsigned long load_avg_addr = 0;
+    static int first_time = 1;
+    int load_avg[3];
+
+    if (first_time) {
+        load_avg_addr = kmem_symbol("avenrun");
+        first_time = 0;
     }
+
+    *value = 0.0;
+    if (kmem_read(load_avg_addr, load_avg, sizeof(load_avg)))
+        *value = (double)load_avg[0] / 65536.0;
+
     if (*value < 0.0) *value = 0.0;
 
     return 1;
 }
 
 int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint32_t* out_bytes) {
-    static int kmem_fd = -1;
-    static int initialized = 0;
-    struct nlist nl[2];
+    static unsigned long ifnet_addr = 0;
+    static int first_time = 1;
     unsigned long ifnetaddr;
     struct ifnet ifnet_buf;
     char name_buf[16];
@@ -241,49 +246,21 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
         return 0;
     }
 
-    if (!initialized) {
-        kmem_fd = open("/dev/kmem", O_RDONLY);
-        initialized = 1;
+    if (first_time) {
+        ifnet_addr = kmem_symbol("ifnet");
+        first_time = 0;
     }
 
-    if (kmem_fd < 0) {
-        return 0;
-    }
-
-    memset(nl, 0, sizeof(nl));
-    nl[0].n_name = "ifnet";
-    nl[1].n_name = NULL;
-
-    if (nlist("/unix", nl) < 0) {
-        return 0;
-    }
-
-    if (nl[0].n_value == 0) {
-        return 0;
-    }
-
-    if (lseek(kmem_fd, nl[0].n_value, SEEK_SET) < 0) {
-        return 0;
-    }
-
-    if (read(kmem_fd, &ifnetaddr, sizeof(ifnetaddr)) != sizeof(ifnetaddr)) {
+    if (!kmem_read(ifnet_addr, &ifnetaddr, sizeof(ifnetaddr))) {
         return 0;
     }
 
     while (ifnetaddr) {
-        if (lseek(kmem_fd, ifnetaddr, SEEK_SET) < 0) {
+        if (!kmem_read(ifnetaddr, &ifnet_buf, sizeof(ifnet_buf))) {
             break;
         }
 
-        if (read(kmem_fd, &ifnet_buf, sizeof(ifnet_buf)) != sizeof(ifnet_buf)) {
-            break;
-        }
-
-        if (lseek(kmem_fd, (unsigned long)ifnet_buf.if_name, SEEK_SET) < 0) {
-            break;
-        }
-
-        if (read(kmem_fd, name_buf, sizeof(name_buf)) != sizeof(name_buf)) {
+        if (!kmem_read((unsigned long)ifnet_buf.if_name, name_buf, sizeof(name_buf))) {
             break;
         }
 

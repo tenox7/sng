@@ -37,7 +37,7 @@ static char *create_default_config_file(const char *path) {
         fprintf(f, "%s", DEFAULT_CONFIG_DEFGW);
     }
     fprintf(f, "%s", DEFAULT_CONFIG_TAIL);
-    fprintf(f, "%s", DEFAULT_CONFIG_BW);
+    fprintf(f, "%s", DEFAULT_CONFIG_NET);
     fclose(f);
 
     return config_path;
@@ -69,6 +69,7 @@ static int parse_type_target(const char *type, const char *target, plot_config_t
     char truncated_target[256];
     char defgw_buf[64];
     int defgw_failed;
+    int is_net;
 
     if (!type || !target) return 0;
 
@@ -76,7 +77,10 @@ static int parse_type_target(const char *type, const char *target, plot_config_t
     actual_target = target;
     defgw_failed = 0;
 
-    if (strcmp(type, "bw") == 0) {
+    /* bw= is a legacy alias for net= */
+    is_net = (strcmp(type, "net") == 0 || strcmp(type, "bw") == 0);
+
+    if (is_net) {
         if (strncmp(target, "snmp1,", 6) == 0) {
             actual_type = "snmp";
             actual_target = target + 6;
@@ -100,12 +104,12 @@ static int parse_type_target(const char *type, const char *target, plot_config_t
 
     if (strcmp(actual_type, "snmp") == 0) {
         if (sscanf(actual_target, "%127[^,],%63[^,],%31s", host, community, iface) == 3) {
-            snprintf(auto_name, sizeof(auto_name), "BW - %s:%s", host, iface);
+            snprintf(auto_name, sizeof(auto_name), "NET - %s:%s", host, iface);
         } else {
-            snprintf(auto_name, sizeof(auto_name), "BW - %s", actual_target);
+            snprintf(auto_name, sizeof(auto_name), "NET - %s", actual_target);
         }
-    } else if (strcmp(type, "bw") == 0) {
-        snprintf(auto_name, sizeof(auto_name), "BW - %s", actual_target);
+    } else if (is_net) {
+        snprintf(auto_name, sizeof(auto_name), "NET - %s", actual_target);
     } else if (strcmp(actual_type, "shell") == 0) {
         pipe_pos = strchr(actual_target, '|');
         if (pipe_pos) {

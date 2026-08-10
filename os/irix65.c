@@ -298,7 +298,7 @@ int os_get_default_gw_ip(char *buf, size_t buflen) {
 
 /* NET_RT_IFLIST has no 5.3 equivalent: the byte counters live in the kernel
  * ifnet chain, reachable only through /dev/kmem. Until that is written,
- * bw=local reports nothing here; bw=snmp1 against the host still works. */
+ * net=local reports nothing here; net=snmp1 against the host still works. */
 int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint32_t* out_bytes) {
     (void)interface_name;
     (void)in_bytes;

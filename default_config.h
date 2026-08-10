@@ -42,8 +42,8 @@ static const char *DEFAULT_CONFIG_DEFGW = "ping=0.0.0.0\n";
 
 static const char *DEFAULT_CONFIG_TAIL =
 "ping=1.1.1.1\n"
-"ping=8.8.8.8\n"
 "cpu=local\n"
+"memory=local\n"
 "loadavg=local\n";
 #endif
 

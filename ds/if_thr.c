@@ -140,6 +140,16 @@ static int if_thr_collect_internal(if_thr_context_t *ctx) {
     in_diff = in_bytes - ctx->prev_in_bytes;
     out_diff = out_bytes - ctx->prev_out_bytes;
 
+    /* A counter reset, or an interface entering/leaving the "all" sum, shows up
+     * as a delta no real link can produce - reseat the baseline instead of
+     * spiking the plot scale. */
+    if (in_diff > 0x80000000UL || out_diff > 0x80000000UL) {
+        ctx->prev_in_bytes = in_bytes;
+        ctx->prev_out_bytes = out_bytes;
+        ctx->prev_time = current_time;
+        return 1;
+    }
+
     in_rate_bps = in_diff / time_diff;
     out_rate_bps = out_diff / time_diff;
     combined_rate_bps = in_rate_bps + out_rate_bps;

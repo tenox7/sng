@@ -24,12 +24,14 @@ static const char *DEFAULT_CONFIG_HEAD =
 
 #ifdef DS_MINIMAL
 static const char *DEFAULT_CONFIG_DEFGW = "";
+static const char *DEFAULT_CONFIG_BW = "";
 
 static const char *DEFAULT_CONFIG_TAIL =
 "clock=24\n";
 #elif defined(__VMS)
 /* loadavg needs the VMS os layer, not implemented yet */
 static const char *DEFAULT_CONFIG_DEFGW = "";
+static const char *DEFAULT_CONFIG_BW = "";
 
 static const char *DEFAULT_CONFIG_TAIL =
 "ping=1.1.1.1\n"
@@ -39,6 +41,14 @@ static const char *DEFAULT_CONFIG_TAIL =
 "clock=24\n";
 #else
 static const char *DEFAULT_CONFIG_DEFGW = "ping=0.0.0.0\n";
+
+/* bw=local,all needs a kernel interface enumeration, which HP-UX 10.20,
+ * IRIX 5 and Tru64 do not have */
+#if defined(HPUX10) || defined(IRIX5) || defined(__osf__) || defined(__OSF1__)
+static const char *DEFAULT_CONFIG_BW = "";
+#else
+static const char *DEFAULT_CONFIG_BW = "bw=local,all\n";
+#endif
 
 static const char *DEFAULT_CONFIG_TAIL =
 "ping=1.1.1.1\n"

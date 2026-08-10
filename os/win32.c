@@ -165,8 +165,12 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
     DWORD size = 0;
     DWORD i;
     int found = 0;
+    int all;
+    uint32_t sum_in = 0, sum_out = 0;
 
     if (!interface_name || !in_bytes || !out_bytes) return 0;
+
+    all = IF_IS_ALL(interface_name);
 
     if (GetIfTable(NULL, &size, FALSE) != ERROR_INSUFFICIENT_BUFFER) return 0;
     table = (PMIB_IFTABLE)malloc(size);
@@ -179,6 +183,13 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
         if (row->dwOperStatus != IF_OPER_STATUS_OPERATIONAL &&
             row->dwOperStatus != IF_OPER_STATUS_CONNECTED) continue;
 
+        if (all) {
+            sum_in += row->dwInOctets;
+            sum_out += row->dwOutOctets;
+            found = 1;
+            continue;
+        }
+
         if (strcmp(interface_name, "any") == 0 ||
             strstr((const char*)row->bDescr, interface_name) != NULL) {
             *in_bytes = row->dwInOctets;
@@ -189,6 +200,12 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
     }
 
     free(table);
+
+    if (all && found) {
+        *in_bytes = sum_in;
+        *out_bytes = sum_out;
+    }
+
     return found;
 }
 

@@ -157,7 +157,8 @@ int os_loadavg_get_stats(double *value) {
 
 /* 10.20 predates the NMAPI and its struct ifnet has no byte counters, so
  * lanadmin's menu is the only source of octet counts. It costs a fork per
- * sample, which stalls the other CMA threads for its duration. */
+ * sample, which stalls the other CMA threads for its duration. That cost is
+ * also why "all" is unsupported here - it would need a fork per interface. */
 int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint32_t* out_bytes) {
     char cmd[192], line[256];
     const char *ppa;
@@ -230,6 +231,9 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
     int val;
     unsigned int ulen;
     int i;
+    int all = IF_IS_ALL(interface_name);
+    uint32_t sum_in = 0, sum_out = 0;
+    int found = 0;
 
     if (if_count == 0) {
         fd = open_mib("/dev/ip", O_RDONLY, 0, NM_ASYNC_OFF);
@@ -266,6 +270,14 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
     }
 
     for (i = 0; i < if_count; i++) {
+        if (all) {
+            if (IF_IS_LOOPBACK(if_list[i].nm_device)) continue;
+            sum_in += (uint32_t)if_list[i].if_entry.ifInOctets;
+            sum_out += (uint32_t)if_list[i].if_entry.ifOutOctets;
+            found = 1;
+            continue;
+        }
+
         if (strcmp(if_list[i].nm_device, interface_name) == 0) {
             *in_bytes = (uint32_t)if_list[i].if_entry.ifInOctets;
             *out_bytes = (uint32_t)if_list[i].if_entry.ifOutOctets;
@@ -273,7 +285,11 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
         }
     }
 
-    return 0;
+    if (!found) return 0;
+
+    *in_bytes = sum_in;
+    *out_bytes = sum_out;
+    return 1;
 }
 
 #endif /* HPUX10 */

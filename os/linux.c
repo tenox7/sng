@@ -181,6 +181,10 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
         return 0;
     }
 
+    int all = IF_IS_ALL(interface_name);
+    uint32_t sum_in = 0, sum_out = 0;
+    int found = 0;
+
     char line[256];
     fgets(line, sizeof(line), fp);
     fgets(line, sizeof(line), fp);
@@ -195,6 +199,14 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
                    ifname, &rx_bytes, &rx_packets, &rx_errs, &rx_drop, &rx_fifo, &rx_frame, &rx_compressed, &rx_multicast,
                    &tx_bytes, &tx_packets, &tx_errs, &tx_drop, &tx_fifo, &tx_colls, &tx_carrier, &tx_compressed) == 17) {
 
+            if (all) {
+                if (IF_IS_LOOPBACK(ifname)) continue;
+                sum_in += (uint32_t)rx_bytes;
+                sum_out += (uint32_t)tx_bytes;
+                found = 1;
+                continue;
+            }
+
             if (strcmp(ifname, interface_name) == 0) {
                 *in_bytes = (uint32_t)rx_bytes;
                 *out_bytes = (uint32_t)tx_bytes;
@@ -205,7 +217,12 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
     }
 
     fclose(fp);
-    return 0;
+
+    if (!found) return 0;
+
+    *in_bytes = sum_in;
+    *out_bytes = sum_out;
+    return 1;
 }
 
 void os_sleep(uint32_t milliseconds) {

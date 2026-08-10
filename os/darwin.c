@@ -199,6 +199,9 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
     char *buf, *next, *lim;
     struct if_msghdr *ifm;
     struct sockaddr_dl *sdl;
+    int all = IF_IS_ALL(interface_name);
+    uint32_t sum_in = 0, sum_out = 0;
+    int found = 0;
 
     mib[0] = CTL_NET;
     mib[1] = PF_ROUTE;
@@ -232,7 +235,13 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
                 memcpy(ifname, sdl->sdl_data, sdl->sdl_nlen);
                 ifname[sdl->sdl_nlen] = '\0';
 
-                if (strcmp(ifname, interface_name) == 0) {
+                if (all) {
+                    if (!IF_IS_LOOPBACK(ifname)) {
+                        sum_in += (uint32_t)ifm->ifm_data.ifi_ibytes;
+                        sum_out += (uint32_t)ifm->ifm_data.ifi_obytes;
+                        found = 1;
+                    }
+                } else if (strcmp(ifname, interface_name) == 0) {
                     *in_bytes = ifm->ifm_data.ifi_ibytes;
                     *out_bytes = ifm->ifm_data.ifi_obytes;
                     free(buf);
@@ -245,7 +254,12 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
     }
 
     free(buf);
-    return 0;
+
+    if (!found) return 0;
+
+    *in_bytes = sum_in;
+    *out_bytes = sum_out;
+    return 1;
 }
 
 void os_sleep(uint32_t milliseconds) {

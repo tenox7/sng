@@ -212,6 +212,9 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
     kstat_named_t *k;
     unsigned int j;
     int found_rbytes, found_obytes;
+    int all = IF_IS_ALL(interface_name);
+    uint32_t in, out, sum_in = 0, sum_out = 0;
+    int found = 0;
 
     if (!kc) {
         kc = kstat_open();
@@ -222,8 +225,17 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
         if (ksp->ks_type != KSTAT_TYPE_NAMED)
             continue;
 
-        if (strcmp(ksp->ks_name, interface_name) != 0)
+        if (all) {
+            if (strcmp(ksp->ks_class, "net") != 0)
+                continue;
+            /* the "link" module mirrors the driver kstats, counting both doubles the rate */
+            if (strcmp(ksp->ks_module, "link") == 0)
+                continue;
+            if (IF_IS_LOOPBACK(ksp->ks_name))
+                continue;
+        } else if (strcmp(ksp->ks_name, interface_name) != 0) {
             continue;
+        }
 
         if (kstat_read(kc, ksp, NULL) == -1)
             continue;
@@ -231,21 +243,40 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
         k = (kstat_named_t *)(ksp->ks_data);
         found_rbytes = 0;
         found_obytes = 0;
+        in = 0;
+        out = 0;
 
         for (j = 0; j < ksp->ks_ndata; j++, k++) {
             if (strncmp(k->name, "rbytes", 6) == 0) {
-                *in_bytes = k->value.ul;
+                in = k->value.ul;
                 found_rbytes = 1;
             } else if (strncmp(k->name, "obytes", 6) == 0) {
-                *out_bytes = k->value.ul;
+                out = k->value.ul;
                 found_obytes = 1;
             }
             if (found_rbytes && found_obytes)
-                return 1;
+                break;
         }
+
+        if (!found_rbytes || !found_obytes)
+            continue;
+
+        if (!all) {
+            *in_bytes = in;
+            *out_bytes = out;
+            return 1;
+        }
+
+        sum_in += in;
+        sum_out += out;
+        found = 1;
     }
 
-    return 0;
+    if (!found) return 0;
+
+    *in_bytes = sum_in;
+    *out_bytes = sum_out;
+    return 1;
 }
 
 void os_sleep(uint32_t milliseconds) {

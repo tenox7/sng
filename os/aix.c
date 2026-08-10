@@ -241,10 +241,15 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
     struct ifnet ifnet_buf;
     char name_buf[16];
     char ifname_full[32];
+    int all;
+    uint32_t sum_in = 0, sum_out = 0;
+    int found = 0;
 
     if (!interface_name || !in_bytes || !out_bytes) {
         return 0;
     }
+
+    all = IF_IS_ALL(interface_name);
 
     if (first_time) {
         ifnet_addr = kmem_symbol("ifnet");
@@ -267,7 +272,13 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
         name_buf[sizeof(name_buf)-1] = '\0';
         snprintf(ifname_full, sizeof(ifname_full), "%s%d", name_buf, ifnet_buf.if_unit);
 
-        if (strcmp(ifname_full, interface_name) == 0) {
+        if (all) {
+            if (!IF_IS_LOOPBACK(ifname_full)) {
+                sum_in += (uint32_t)(ifnet_buf.if_ibytes & 0xffffffff);
+                sum_out += (uint32_t)(ifnet_buf.if_obytes & 0xffffffff);
+                found = 1;
+            }
+        } else if (strcmp(ifname_full, interface_name) == 0) {
             *in_bytes = (uint32_t)(ifnet_buf.if_ibytes & 0xffffffff);
             *out_bytes = (uint32_t)(ifnet_buf.if_obytes & 0xffffffff);
             return 1;
@@ -276,7 +287,11 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
         ifnetaddr = (unsigned long)ifnet_buf.if_next;
     }
 
-    return 0;
+    if (!found) return 0;
+
+    *in_bytes = sum_in;
+    *out_bytes = sum_out;
+    return 1;
 }
 
 void os_sleep(uint32_t milliseconds) {

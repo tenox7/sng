@@ -37,6 +37,7 @@ static char *create_default_config_file(const char *path) {
         fprintf(f, "%s", DEFAULT_CONFIG_DEFGW);
     }
     fprintf(f, "%s", DEFAULT_CONFIG_TAIL);
+    fprintf(f, "%s", DEFAULT_CONFIG_BW);
     fclose(f);
 
     return config_path;

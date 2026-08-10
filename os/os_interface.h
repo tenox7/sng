@@ -7,6 +7,7 @@
 #include "../compat.h"
 #endif
 #include <stddef.h>
+#include <string.h>
 
 typedef struct plot_mutex_t plot_mutex_t;
 typedef struct plot_thread_t plot_thread_t;
@@ -22,8 +23,15 @@ int os_memory_get_stats(double *value);
 /* Load average functions */
 int os_loadavg_get_stats(double *value);
 
-/* Interface throughput functions - following existing pattern */
+/* Interface throughput functions - following existing pattern.
+ * The pseudo interface "all" sums every non-loopback interface. Backends add
+ * the raw counters modulo 2^32, which keeps the caller's unsigned delta
+ * arithmetic correct as long as the aggregate delta stays under 4GB/sample. */
 int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint32_t* out_bytes);
+
+#define IF_IS_ALL(n) ((n) && strcmp((n), "all") == 0)
+#define IF_IS_LOOPBACK(n) ((n)[0] == 'l' && (n)[1] == 'o' && \
+                           ((n)[2] == '\0' || ((n)[2] >= '0' && (n)[2] <= '9')))
 
 /* Platform detection */
 const char* os_get_platform_name(void);

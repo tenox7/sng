@@ -111,6 +111,9 @@ You can also specify the location with `-f /full/path/to/sng.ini`
 - `ping=0.0.0.0` - ICMP echo to host's default gateway IP address (resolves to read gw IP address from routing table)
 - `tcp=<host>:<port>` - TCP connect latency (e.g., `tcp=192.168.1.1:443`, also accepts `tcp=host,port`)
 - `bw=local,<interface>` - local interface throughput (e.g., `bw=local,eth0`)
+- `bw=local,all` - sum of throughput across every non-loopback interface. Bridge and VM/container
+  members are counted alongside their parent, so bridged traffic shows up more than once.
+  Not available on HP-UX 10.20, Tru64, IRIX 5 or VMS
 - `bw=snmp1,<host>,<community>,<ifidx>` - SNMP bandwidth (e.g., `bw=snmp1,192.168.1.1,public,7`)
 - `cpu=local` - CPU usage percentage
 - `memory=local` - memory usage percentage

@@ -6,6 +6,7 @@
 #include <ipexport.h>
 #include <icmpapi.h>
 #include <pdh.h>
+#include <psapi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -118,19 +119,51 @@ int os_cpu_get_stats_dual(double *total_value, double *system_value) {
     return 1;
 }
 
-int os_memory_get_stats(double *value) {
+/* Only GetPerformanceInfo breaks out SystemCache; MEMORYSTATUSEX alone counts
+ * the standby list as used. Swap here is commit charge, not pagefile occupancy
+ * - CommitLimit is RAM plus pagefile - so it is not what the Unix backends
+ * report, but it is the number that predicts an allocation failure. */
+int os_memory_get_stats_dual(double *used_value, double *swap_value) {
     MEMORYSTATUSEX ms;
+    PERFORMANCE_INFORMATION pi;
+    SIZE_T used_pages;
 
-    if (!value) return 0;
+    if (!used_value || !swap_value) return 0;
+
+    pi.cb = sizeof(pi);
+    if (GetPerformanceInfo(&pi) && pi.PhysicalTotal > 0) {
+        used_pages = pi.PhysicalTotal;
+        if (pi.PhysicalAvailable + pi.SystemCache < used_pages)
+            used_pages -= pi.PhysicalAvailable + pi.SystemCache;
+        else
+            used_pages = 0;
+
+        *used_value = 100.0 * (double)used_pages / (double)pi.PhysicalTotal;
+        OS_CLAMP_PCT(*used_value);
+
+        *swap_value = pi.CommitLimit
+                    ? 100.0 * (double)pi.CommitTotal / (double)pi.CommitLimit : 0.0;
+        OS_CLAMP_PCT(*swap_value);
+        return 1;
+    }
+
     ms.dwLength = sizeof(ms);
     if (!GlobalMemoryStatusEx(&ms)) return 0;
-
     if (ms.ullTotalPhys == 0) return 0;
-    *value = 100.0 * (double)(ms.ullTotalPhys - ms.ullAvailPhys) / (double)ms.ullTotalPhys;
 
-    if (*value > 100.0) *value = 100.0;
-    if (*value < 0.0) *value = 0.0;
+    *used_value = 100.0 * (double)(ms.ullTotalPhys - ms.ullAvailPhys) / (double)ms.ullTotalPhys;
+    OS_CLAMP_PCT(*used_value);
+
+    *swap_value = ms.ullTotalPageFile
+                ? 100.0 * (double)(ms.ullTotalPageFile - ms.ullAvailPageFile)
+                  / (double)ms.ullTotalPageFile : 0.0;
+    OS_CLAMP_PCT(*swap_value);
     return 1;
+}
+
+int os_memory_get_stats(double *value) {
+    double swap;
+    return os_memory_get_stats_dual(value, &swap);
 }
 
 int os_loadavg_get_stats(double *value) {

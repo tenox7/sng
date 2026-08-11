@@ -115,29 +115,57 @@ int os_cpu_get_stats_dual(double *total_value, double *system_value) {
     return 1;
 }
 
-int os_memory_get_stats(double *value) {
+/* psd_rm is real memory held by processes. pstat has no buffer cache field, so
+ * the cache never enters the figure and this reads low rather than pinned high.
+ * Pseudo-swap is memory-backed and would fold RAM into the swap total. */
+int os_memory_get_stats_dual(double *used_value, double *swap_value) {
     struct pst_static pststatic;
     struct pst_dynamic pstdynamic;
-    uint64_t total_memory, free_memory, used_memory;
+    struct pst_swapinfo swi;
+    uint64_t total_pages, used_pages, swap_total, swap_free;
+    int idx;
+
+    if (!used_value || !swap_value) return 0;
 
     if (pstat_getstatic(&pststatic, sizeof(struct pst_static), 1, 0) == -1)
         return 0;
-
     if (pstat_getdynamic(&pstdynamic, sizeof(struct pst_dynamic), 1, 0) == -1)
         return 0;
 
-    total_memory = pststatic.physical_memory * pststatic.page_size;
-    free_memory = pstdynamic.psd_free * pststatic.page_size;
+    total_pages = (uint64_t)pststatic.physical_memory;
+    if (total_pages == 0) return 0;
 
-    if (total_memory == 0) return 0;
+    used_pages = (uint64_t)pstdynamic.psd_rm;
+    if (used_pages > total_pages) used_pages = total_pages;
+    *used_value = (double)used_pages / (double)total_pages * 100.0;
+    OS_CLAMP_PCT(*used_value);
 
-    used_memory = total_memory - free_memory;
-    *value = (double)used_memory / (double)total_memory * 100.0;
+    swap_total = 0;
+    swap_free = 0;
+    idx = 0;
+    while (pstat_getswap(&swi, sizeof(swi), 1, idx) > 0) {
+        idx = swi.pss_idx + 1;
+        if (!(swi.pss_flags & SW_ENABLED)) continue;
+#ifdef SW_PSEUDO
+        if (swi.pss_flags & SW_PSEUDO) continue;
+#endif
+        swap_total += (uint64_t)swi.pss_nblksenabled;
+        swap_free += (uint64_t)swi.pss_nblksavail;
+    }
 
-    if (*value > 100.0) *value = 100.0;
-    if (*value < 0.0) *value = 0.0;
+    if (swap_total == 0 || swap_free > swap_total) {
+        *swap_value = 0.0;
+        return 1;
+    }
+    *swap_value = (double)(swap_total - swap_free) / (double)swap_total * 100.0;
+    OS_CLAMP_PCT(*swap_value);
 
     return 1;
+}
+
+int os_memory_get_stats(double *value) {
+    double swap;
+    return os_memory_get_stats_dual(value, &swap);
 }
 
 int os_loadavg_get_stats(double *value) {

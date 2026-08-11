@@ -184,12 +184,17 @@ int os_cpu_get_stats_dual(double *total_value, double *system_value) {
     return 1;
 }
 
-int os_memory_get_stats(double *value) {
+/* numperm is the file cache, reclaimed under pressure, so it is not app memory.
+ * AIX charges paging space on reservation, not page-out: under early or late
+ * allocation policy swap can read non-zero on a box that has never paged. */
+int os_memory_get_stats_dual(double *used_value, double *swap_value) {
     static unsigned long vmker_addr = 0;
     static long pagesize = 0;
     static int first_time = 1;
     struct vmker vmk;
-    uint64_t total_memory, free_memory, used_memory;
+    uint64_t total_memory, free_memory, used_memory, swap_used;
+
+    if (!used_value || !swap_value) return 0;
 
     if (first_time) {
         vmker_addr = kmem_symbol("vmker");
@@ -203,16 +208,26 @@ int os_memory_get_stats(double *value) {
     total_memory = (uint64_t)vmk.totalmem * pagesize;
     if (total_memory == 0) return 0;
 
-    /* numperm is the file cache, which the kernel hands back under pressure,
-     * so count it as available rather than used */
     free_memory = ((uint64_t)vmk.freemem + (uint64_t)vmk.numperm) * pagesize;
     used_memory = total_memory > free_memory ? total_memory - free_memory : 0;
-    *value = (double)used_memory / (double)total_memory * 100.0;
+    *used_value = (double)used_memory / (double)total_memory * 100.0;
+    OS_CLAMP_PCT(*used_value);
 
-    if (*value > 100.0) *value = 100.0;
-    if (*value < 0.0) *value = 0.0;
+    if (vmk.totalvmem == 0) {
+        *swap_value = 0.0;
+        return 1;
+    }
+    swap_used = vmk.totalvmem > vmk.freevmem
+              ? (uint64_t)vmk.totalvmem - (uint64_t)vmk.freevmem : 0;
+    *swap_value = (double)swap_used / (double)vmk.totalvmem * 100.0;
+    OS_CLAMP_PCT(*swap_value);
 
     return 1;
+}
+
+int os_memory_get_stats(double *value) {
+    double swap;
+    return os_memory_get_stats_dual(value, &swap);
 }
 
 int os_loadavg_get_stats(double *value) {

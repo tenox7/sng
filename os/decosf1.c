@@ -137,27 +137,53 @@ int os_cpu_get_stats_dual(double *total_value, double *system_value) {
     return 1;
 }
 
-int os_memory_get_stats(double *value) {
+/* The inactive queue is where the UBC parks clean file pages, so active plus
+ * wired is already app memory. Wired-down UBC pages land in wire_count though,
+ * so this reads high under heavy file I/O. TBL_SWAPINFO is guarded because the
+ * older OSF/1 releases this also targets do not all define it. */
+int os_memory_get_stats_dual(double *used_value, double *swap_value) {
     vm_statistics_data_t vmstats;
-    uint64_t total_memory, used_memory;
+    uint64_t total_pages, used_pages;
+#ifdef TBL_SWAPINFO
+    struct swapinfo swi;
+    uint64_t swap_total, swap_free;
+    int i;
+#endif
+
+    if (!used_value || !swap_value) return 0;
 
     if (vm_statistics(task_self(), &vmstats) != KERN_SUCCESS)
         return 0;
 
-    total_memory = vmstats.free_count + vmstats.active_count +
-                   vmstats.inactive_count + vmstats.wire_count;
-
-    if (total_memory == 0)
+    total_pages = (uint64_t)vmstats.free_count + (uint64_t)vmstats.active_count +
+                  (uint64_t)vmstats.inactive_count + (uint64_t)vmstats.wire_count;
+    if (total_pages == 0)
         return 0;
 
-    used_memory = vmstats.active_count + vmstats.wire_count;
+    used_pages = (uint64_t)vmstats.active_count + (uint64_t)vmstats.wire_count;
+    *used_value = (double)used_pages / (double)total_pages * 100.0;
+    OS_CLAMP_PCT(*used_value);
 
-    *value = (double)used_memory / (double)total_memory * 100.0;
-
-    if (*value > 100.0) *value = 100.0;
-    if (*value < 0.0) *value = 0.0;
+    *swap_value = 0.0;
+#ifdef TBL_SWAPINFO
+    swap_total = 0;
+    swap_free = 0;
+    for (i = 0; table(TBL_SWAPINFO, i, &swi, 1, sizeof(swi)) > 0; i++) {
+        swap_total += (uint64_t)swi.si_swapsize;
+        swap_free += (uint64_t)swi.si_free;
+    }
+    if (swap_total > 0 && swap_free <= swap_total) {
+        *swap_value = (double)(swap_total - swap_free) / (double)swap_total * 100.0;
+        OS_CLAMP_PCT(*swap_value);
+    }
+#endif
 
     return 1;
+}
+
+int os_memory_get_stats(double *value) {
+    double swap;
+    return os_memory_get_stats_dual(value, &swap);
 }
 
 int os_loadavg_get_stats(double *value) {

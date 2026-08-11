@@ -122,36 +122,7 @@ int os_cpu_get_stats_dual(double *total_value, double *system_value) {
     return 1;
 }
 
-int os_memory_get_stats(double *value) {
-    FILE *fp;
-    char line[256];
-    uint64_t mem_total, mem_available;
-    uint64_t total_memory, free_memory, used_memory;
-
-    fp = fopen("/proc/meminfo", "r");
-    if (!fp) return 0;
-
-    mem_total = 0;
-    mem_available = 0;
-    while (fgets(line, sizeof(line), fp)) {
-        if (sscanf(line, "MemTotal: %lu kB", &mem_total) == 1) {
-            total_memory = mem_total * 1024;
-        } else if (sscanf(line, "MemAvailable: %lu kB", &mem_available) == 1) {
-            free_memory = mem_available * 1024;
-        }
-    }
-    fclose(fp);
-
-    if (total_memory == 0) return 0;
-
-    used_memory = total_memory - free_memory;
-    *value = (double)used_memory / (double)total_memory * 100.0;
-
-    if (*value > 100.0) *value = 100.0;
-    if (*value < 0.0) *value = 0.0;
-
-    return 1;
-}
+#include "proc-meminfo.c"
 
 int os_loadavg_get_stats(double *value) {
     FILE *fp;

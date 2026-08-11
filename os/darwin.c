@@ -146,38 +146,60 @@ int os_cpu_get_stats_dual(double *total_value, double *system_value) {
     return 1;
 }
 
-int os_memory_get_stats(double *value) {
+/* App memory as Activity Monitor computes it: anonymous minus purgeable, plus
+ * wired, plus compressor. The file cache (external_page_count) is left out.
+ * Page size must come from the kernel - Apple silicon runs 16K pages. */
+int os_memory_get_stats_dual(double *used_value, double *swap_value) {
     int mib[2];
     size_t len;
-    uint64_t total_memory;
+    uint64_t total_memory, app_pages, used_memory;
     vm_statistics64_data_t vm_stats;
     mach_msg_type_number_t count;
-    uint64_t free_memory, used_memory;
+    vm_size_t page_size;
+    mach_port_t host;
+    struct xsw_usage swap;
+
+    if (!used_value || !swap_value) return 0;
 
     mib[0] = CTL_HW;
     mib[1] = HW_MEMSIZE;
     len = sizeof(total_memory);
-    if (sysctl(mib, 2, &total_memory, &len, NULL, 0) != 0) {
-        return 0;
-    }
+    if (sysctl(mib, 2, &total_memory, &len, NULL, 0) != 0) return 0;
+    if (total_memory == 0) return 0;
+
+    host = mach_host_self();
+    if (host_page_size(host, &page_size) != KERN_SUCCESS) page_size = 4096;
 
     count = HOST_VM_INFO64_COUNT;
-    if (host_statistics64(mach_host_self(), HOST_VM_INFO64,
+    if (host_statistics64(host, HOST_VM_INFO64,
                          (host_info64_t)&vm_stats, &count) != KERN_SUCCESS) {
         return 0;
     }
 
-    free_memory = vm_stats.free_count * 4096;
+    app_pages = (uint64_t)vm_stats.internal_page_count +
+                (uint64_t)vm_stats.compressor_page_count +
+                (uint64_t)vm_stats.wire_count;
+    if ((uint64_t)vm_stats.purgeable_count < app_pages)
+        app_pages -= (uint64_t)vm_stats.purgeable_count;
 
-    if (total_memory == 0) return 0;
+    used_memory = app_pages * (uint64_t)page_size;
+    *used_value = (double)used_memory / (double)total_memory * 100.0;
+    OS_CLAMP_PCT(*used_value);
 
-    used_memory = total_memory - free_memory;
-    *value = (double)used_memory / (double)total_memory * 100.0;
-
-    if (*value > 100.0) *value = 100.0;
-    if (*value < 0.0) *value = 0.0;
+    len = sizeof(swap);
+    if (sysctlbyname("vm.swapusage", &swap, &len, NULL, 0) != 0 || swap.xsu_total == 0) {
+        *swap_value = 0.0;
+        return 1;
+    }
+    *swap_value = (double)swap.xsu_used / (double)swap.xsu_total * 100.0;
+    OS_CLAMP_PCT(*swap_value);
 
     return 1;
+}
+
+int os_memory_get_stats(double *value) {
+    double swap;
+    return os_memory_get_stats_dual(value, &swap);
 }
 
 int os_loadavg_get_stats(double *value) {

@@ -9,6 +9,7 @@ struct plot_thread_t {
 };
 #include <kstat.h>
 #include <sys/sysinfo.h>
+#include <sys/swap.h>
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
@@ -146,40 +147,61 @@ int os_cpu_get_stats_dual(double *total_value, double *system_value) {
     return 1;
 }
 
-int os_memory_get_stats(double *value) {
+/* Unified VM folded the file cache into the page cache, and nothing in
+ * unix:0:system_pages counts it, so there is no resident app-memory figure to
+ * be had here. Both values are instead anon reserved (what `swap -s` calls
+ * used): committed memory, including pages already paged out, so this reads
+ * higher than other backends and can show swap on a box that never paged.
+ * Falls back to the freemem ratio if swapctl is unavailable. */
+int os_memory_get_stats_dual(double *used_value, double *swap_value) {
     static kstat_ctl_t *kc = NULL;
     static long page_size = 0;
     static uint64_t total_pages = 0;
     kstat_t *ksp;
     kstat_named_t *k;
-    uint64_t total_memory, free_memory, used_memory;
+    struct anoninfo ai;
+    uint64_t free_pages, used_pages;
+
+    if (!used_value || !swap_value) return 0;
 
     if (!kc) {
         kc = kstat_open();
         if (!kc) return 0;
         page_size = sysconf(_SC_PAGESIZE);
-        total_pages = sysconf(_SC_PHYS_PAGES);
+        total_pages = (uint64_t)sysconf(_SC_PHYS_PAGES);
     }
+    if (total_pages == 0) return 0;
 
-    total_memory = total_pages * page_size;
+    *swap_value = 0.0;
+
+    if (swapctl(SC_AINFO, &ai) != -1 && ai.ani_max > 0) {
+        used_pages = (uint64_t)ai.ani_resv;
+        *used_value = (double)used_pages / (double)total_pages * 100.0;
+        OS_CLAMP_PCT(*used_value);
+
+        *swap_value = (double)ai.ani_resv / (double)ai.ani_max * 100.0;
+        OS_CLAMP_PCT(*swap_value);
+        return 1;
+    }
 
     ksp = kstat_lookup(kc, "unix", 0, "system_pages");
     if (!ksp) return 0;
-
     if (kstat_read(kc, ksp, NULL) == -1) return 0;
 
     k = (kstat_named_t *)kstat_data_lookup(ksp, "freemem");
-    if (k) free_memory = k->value.ul * page_size;
+    if (!k) return 0;
+    free_pages = (uint64_t)k->value.ul;
 
-    if (total_memory == 0) return 0;
-
-    used_memory = total_memory - free_memory;
-    *value = (double)used_memory / (double)total_memory * 100.0;
-
-    if (*value > 100.0) *value = 100.0;
-    if (*value < 0.0) *value = 0.0;
+    used_pages = total_pages > free_pages ? total_pages - free_pages : 0;
+    *used_value = (double)used_pages / (double)total_pages * 100.0;
+    OS_CLAMP_PCT(*used_value);
 
     return 1;
+}
+
+int os_memory_get_stats(double *value) {
+    double swap;
+    return os_memory_get_stats_dual(value, &swap);
 }
 
 int os_loadavg_get_stats(double *value) {

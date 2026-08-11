@@ -11,6 +11,7 @@ struct plot_thread_t {
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <sys/socket.h>
+#include <vm/vm_param.h>
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <net/route.h>
@@ -128,34 +129,67 @@ int os_cpu_get_stats_dual(double *total_value, double *system_value) {
     return 1;
 }
 
-int os_memory_get_stats(double *value) {
-    size_t size;
-    uint64_t free_pages, page_size, total_memory, free_memory, used_memory;
+static uint32_t bsd_vmstat(const char *name) {
+    uint32_t v = 0;
+    size_t size = sizeof(v);
+    if (sysctlbyname(name, &v, &size, NULL, 0) != 0) return 0;
+    return v;
+}
 
-    size = sizeof(uint64_t);
-    if (sysctlbyname("hw.physmem", &total_memory, &size, NULL, 0) != 0) {
-        total_memory = 0;
-    }
+/* v_cache_count went away in FreeBSD 12 and v_laundry_count arrived in 11; a
+ * missing sysctl reads 0 either way. The inactive queue mixes clean file pages
+ * with dirty anon awaiting laundering, so crediting it all reads somewhat low. */
+int os_memory_get_stats_dual(double *used_value, double *swap_value) {
+    size_t size, nmib;
+    int mib[16];
+    uint64_t total_memory, page_size, avail_pages, avail_memory, used_memory;
+    uint64_t swap_total, swap_used;
+    struct xswdev xsw;
+    int i;
 
-    free_pages = 0;
-    page_size = 0;
-    size = sizeof(free_pages);
-    if (sysctlbyname("vm.stats.vm.v_free_count", &free_pages, &size, NULL, 0) == 0) {
-        size = sizeof(page_size);
-        if (sysctlbyname("vm.stats.vm.v_page_size", &page_size, &size, NULL, 0) == 0) {
-            free_memory = free_pages * page_size;
+    if (!used_value || !swap_value) return 0;
+
+    size = sizeof(total_memory);
+    if (sysctlbyname("hw.physmem", &total_memory, &size, NULL, 0) != 0 || total_memory == 0)
+        return 0;
+
+    page_size = bsd_vmstat("vm.stats.vm.v_page_size");
+    if (page_size == 0) page_size = getpagesize();
+
+    avail_pages = (uint64_t)bsd_vmstat("vm.stats.vm.v_free_count") +
+                  (uint64_t)bsd_vmstat("vm.stats.vm.v_inactive_count") +
+                  (uint64_t)bsd_vmstat("vm.stats.vm.v_laundry_count") +
+                  (uint64_t)bsd_vmstat("vm.stats.vm.v_cache_count");
+
+    avail_memory = avail_pages * page_size;
+    used_memory = total_memory > avail_memory ? total_memory - avail_memory : 0;
+    *used_value = (double)used_memory / (double)total_memory * 100.0;
+    OS_CLAMP_PCT(*used_value);
+
+    /* vm.swap_info is an array indexed by device; walk until it runs out. */
+    swap_total = 0;
+    swap_used = 0;
+    nmib = sizeof(mib) / sizeof(mib[0]) - 1;
+    if (sysctlnametomib("vm.swap_info", mib, &nmib) == 0) {
+        for (i = 0; ; i++) {
+            mib[nmib] = i;
+            size = sizeof(xsw);
+            if (sysctl(mib, (u_int)(nmib + 1), &xsw, &size, NULL, 0) != 0) break;
+            if (xsw.xsw_version != XSWDEV_VERSION) break;
+            swap_total += (uint64_t)xsw.xsw_nblks;
+            swap_used += (uint64_t)xsw.xsw_used;
         }
     }
 
-    if (total_memory == 0) return 0;
-
-    used_memory = total_memory - free_memory;
-    *value = (double)used_memory / (double)total_memory * 100.0;
-
-    if (*value > 100.0) *value = 100.0;
-    if (*value < 0.0) *value = 0.0;
+    *swap_value = swap_total ? (double)swap_used / (double)swap_total * 100.0 : 0.0;
+    OS_CLAMP_PCT(*swap_value);
 
     return 1;
+}
+
+int os_memory_get_stats(double *value) {
+    double swap;
+    return os_memory_get_stats_dual(value, &swap);
 }
 
 int os_loadavg_get_stats(double *value) {

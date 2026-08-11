@@ -15,6 +15,7 @@ struct plot_thread_t {
 #include <sys/types.h>
 #include <sys/sysinfo.h>
 #include <sys/sysmp.h>
+#include <sys/swap.h>
 #include <nlist.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -220,35 +221,65 @@ int os_cpu_get_stats_dual(double *total_value, double *system_value) {
     return 1;
 }
 
-int os_memory_get_stats(double *value) {
-    int freemem, maxmem, availrmem;
-    uint64_t total_memory, free_memory, used_memory;
+/* sysmp(MPSA_RMINFO) needs no /dev/kmem, unlike the nlist path avenrun still
+ * uses below. Falls back to that path if sysmp fails. */
+static int irix_swap_pct(double *swap_value) {
+    off_t total, freeblk;
+
+    *swap_value = 0.0;
+    if (swapctl(SC_GETSWAPTOT, &total) == -1 || total <= 0) return 1;
+    if (swapctl(SC_GETFREESWAP, &freeblk) == -1) return 1;
+    if (freeblk < 0) freeblk = 0;
+    if (freeblk > total) freeblk = total;
+    *swap_value = (double)(total - freeblk) / (double)total * 100.0;
+    OS_CLAMP_PCT(*swap_value);
+    return 1;
+}
+
+int os_memory_get_stats_dual(double *used_value, double *swap_value) {
+    struct rminfo rmi;
+    int freemem, maxmem, rmisz;
+    uint64_t total_pages, cache_pages, avail_pages, used_pages;
+
+    if (!used_value || !swap_value) return 0;
+
+    /* struct rminfo grew across IRIX releases; ask the kernel for its size */
+    rmisz = sysmp(MP_SASZ, MPSA_RMINFO);
+    if (rmisz <= 0 || rmisz > (int)sizeof(rmi)) rmisz = (int)sizeof(rmi);
+
+    if (sysmp(MP_SAGET, MPSA_RMINFO, (char *)&rmi, rmisz) != -1 &&
+        rmi.physmem > 0) {
+        /* bufmem plus the delwri and chunk page pools are all filesystem cache */
+        total_pages = (uint64_t)rmi.physmem;
+        cache_pages = (uint64_t)rmi.bufmem + (uint64_t)rmi.dpages +
+                      (uint64_t)rmi.chunkpages;
+        avail_pages = (uint64_t)rmi.freemem + cache_pages;
+        used_pages = total_pages > avail_pages ? total_pages - avail_pages : 0;
+        *used_value = (double)used_pages / (double)total_pages * 100.0;
+        OS_CLAMP_PCT(*used_value);
+        return irix_swap_pct(swap_value);
+    }
 
     if (!nlist_initialized || kmem == -1)
         return 0;
 
     if (!getkval(nlst[X_FREEMEM].n_value, &freemem, sizeof(freemem)))
         return 0;
-
     if (!getkval(nlst[X_MAXMEM].n_value, &maxmem, sizeof(maxmem)))
         return 0;
-
-    if (!getkval(nlst[X_AVAILRMEM].n_value, &availrmem, sizeof(availrmem)))
-        availrmem = freemem;
-
-    total_memory = (uint64_t)maxmem * pagesize;
-    free_memory = (uint64_t)freemem * pagesize;
-
-    if (total_memory == 0)
+    if (maxmem <= 0)
         return 0;
 
-    used_memory = total_memory - free_memory;
-    *value = (double)used_memory / (double)total_memory * 100.0;
+    used_pages = maxmem > freemem ? (uint64_t)(maxmem - freemem) : 0;
+    *used_value = (double)used_pages / (double)maxmem * 100.0;
+    OS_CLAMP_PCT(*used_value);
 
-    if (*value > 100.0) *value = 100.0;
-    if (*value < 0.0) *value = 0.0;
+    return irix_swap_pct(swap_value);
+}
 
-    return 1;
+int os_memory_get_stats(double *value) {
+    double swap;
+    return os_memory_get_stats_dual(value, &swap);
 }
 
 int os_loadavg_get_stats(double *value) {

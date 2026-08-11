@@ -175,12 +175,14 @@ int os_cpu_get_stats(double *value) {
     return 1;
 }
 
-int os_memory_get_stats(double *value) {
+/* No Unix-style page cache to subtract: memory is in working sets, the free
+ * list, or the modified list. Free plus modified is what can be handed out. */
+int os_memory_get_stats_dual(double *used_value, double *swap_value) {
 #ifdef __VAX
     static unsigned int memsize = 0;
-    unsigned int avail;
+    unsigned int avail, pgfl_total, pgfl_free;
 
-    if (!value) return 0;
+    if (!used_value || !swap_value) return 0;
 
     if (memsize == 0) {
         memsize = vms_getsyi_long(SYI$_MEMSIZE, 0);
@@ -190,17 +192,33 @@ int os_memory_get_stats(double *value) {
     avail = sch$gl_freecnt + sch$gl_mfycnt;
     if (avail > memsize) avail = memsize;
 
-    *value = 100.0 * (double)(memsize - avail) / (double)memsize;
+    *used_value = 100.0 * (double)(memsize - avail) / (double)memsize;
+    OS_CLAMP_PCT(*used_value);
 
-    if (*value > 100.0) *value = 100.0;
-    if (*value < 0.0) *value = 0.0;
+    *swap_value = 0.0;
+#if defined(SYI$_PAGEFILE_PAGE) && defined(SYI$_PAGEFILE_FREE)
+    pgfl_total = vms_getsyi_long(SYI$_PAGEFILE_PAGE, 0);
+    pgfl_free = vms_getsyi_long(SYI$_PAGEFILE_FREE, 0);
+    if (pgfl_total > 0 && pgfl_free <= pgfl_total) {
+        *swap_value = 100.0 * (double)(pgfl_total - pgfl_free) / (double)pgfl_total;
+        OS_CLAMP_PCT(*swap_value);
+    }
+#else
+    (void)pgfl_total; (void)pgfl_free;
+#endif
 
     return 1;
 #else
     /* Alpha/I64: use SYI$_FREE_PAGE_COUNT when that port happens */
-    (void)value;
+    (void)used_value;
+    (void)swap_value;
     return 0;
 #endif
+}
+
+int os_memory_get_stats(double *value) {
+    double swap;
+    return os_memory_get_stats_dual(value, &swap);
 }
 
 int os_loadavg_get_stats(double *value) {

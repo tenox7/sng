@@ -17,8 +17,15 @@ typedef struct plot_timer_t plot_timer_t;
 int os_cpu_get_stats(double *value);
 int os_cpu_get_stats_dual(double *total_value, double *system_value);
 
-/* Memory statistics functions */
+/* Memory statistics. Primary is app memory (physical minus free minus the
+ * reclaimable file cache) as a percent of physical; the free list alone pins at
+ * ~100% once the page cache fills. Secondary is swap used as a percent of swap
+ * total, 0.0 when there is no swap - store 0.0 rather than failing, or the ring
+ * buffer stops advancing for the primary series too. */
 int os_memory_get_stats(double *value);
+int os_memory_get_stats_dual(double *used_value, double *swap_value);
+
+#define OS_CLAMP_PCT(v) do { if ((v) > 100.0) (v) = 100.0; if ((v) < 0.0) (v) = 0.0; } while (0)
 
 /* Load average functions */
 int os_loadavg_get_stats(double *value);

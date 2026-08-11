@@ -236,9 +236,15 @@ int os_cpu_get_stats_dual(double *total_value, double *system_value) {
     return 1;
 }
 
-int os_memory_get_stats(double *value) {
-    *value = 0.0;
+int os_memory_get_stats_dual(double *used_value, double *swap_value) {
+    if (used_value) *used_value = 0.0;
+    if (swap_value) *swap_value = 0.0;
     return 0;
+}
+
+int os_memory_get_stats(double *value) {
+    double swap;
+    return os_memory_get_stats_dual(value, &swap);
 }
 
 int os_loadavg_get_stats(double *value) {

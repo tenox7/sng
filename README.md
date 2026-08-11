@@ -117,7 +117,7 @@ You can also specify the location with `-f /full/path/to/sng.ini`
 - `net=snmp1,<host>,<community>,<ifidx>` - SNMP bandwidth (e.g., `net=snmp1,192.168.1.1,public,7`)
 - `bw=` - legacy alias for `net=`, still accepted in existing config files
 - `cpu=local` - CPU usage percentage
-- `memory=local` - memory usage percentage
+- `memory=local` - app memory percentage, swap used percentage as second line
 - `loadavg=local` - load average
 - `shell=<command>` - shell command output (e.g., `shell=ping -i 10 1.1.1.1 | sed 's/.*time=//;s/ ms//'`)
 

@@ -22,6 +22,7 @@ Supports multiple graphs with:
 - HP-UX
 - AIX
 - UnixWare
+- SCO OpenServer 6
 - IRIX
 - Tru64
 - Windows/Win32
@@ -185,6 +186,20 @@ make macos
 ```
 nmake -f Makefile.win32
 ```
+
+### SCO OpenServer 6
+
+Builds with the bundled CCS 4.2 compiler and the stock `make`, no gcc needed:
+
+```
+make -f Makefile.x11 osr6
+```
+
+Notes: CPU and memory come from the MAS kernel metrics (`/var/adm/metreg.data`),
+swap from `swapctl()`, and `net=` from the DLPI statistics of `/dev/<ifname>` -
+the same source `netstat -i` uses. The kernel never updates `avenrun` (which is
+why `uptime` always shows 0.00), so `loadavg=` is computed here by sampling the
+run queue out of `/proc`.
 
 ### OpenVMS
 

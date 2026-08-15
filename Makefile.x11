@@ -14,6 +14,12 @@ $(TARGET): $(OBJECTS)
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# SysV make ignores the pattern rule above and its built-in .c.o drops the
+# object in the current directory, which breaks the ds/ and os/ subdirectories.
+.SUFFIXES: .c .o
+.c.o:
+	$(CC) $(CFLAGS) -c $< -o $@
+
 linux:
 	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -DLINUX" LDFLAGS="-lX11 -lpthread -lm"
 
@@ -32,6 +38,12 @@ aix:
 
 unixware:
 	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -DUNIXWARE" LDFLAGS="-lX11 -lthread -lm -lsocket -lnsl -lelf -lmas"
+
+# SCO OpenServer 6: native CCS 4.2 cc, POSIX threads via -Kthread.
+osr6:
+	$(MAKE) -f Makefile.x11 CC=cc \
+	  CFLAGS="-O -Kthread -DGFX_X11 -DOSR6" \
+	  LDFLAGS="-Kthread -L/usr/X11R6/lib -lX11 -lsocket -lnsl -lmas -lelf -lm"
 
 osf1:
 	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -pthread" LDFLAGS="-lX11 -pthread -lm -lmach"
@@ -64,4 +76,4 @@ clean:
 install: $(TARGET)
 	cp $(TARGET) /usr/local/bin/
 
-.PHONY: all clean install linux solaris hpux hpux10 aix unixware osf1 irix irix5
+.PHONY: all clean install linux solaris hpux hpux10 aix unixware osr6 osf1 irix irix5

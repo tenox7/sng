@@ -14,6 +14,8 @@
     #include "hpux.c"
 #elif defined(_AIX)
     #include "aix.c"
+#elif defined(OSR6)
+    #include "osr6.c"
 #elif defined(UNIXWARE) || defined(__USLC__)
     #include "unixware.c"
 #elif defined(sgi) || defined(__sgi)

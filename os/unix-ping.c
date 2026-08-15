@@ -18,7 +18,7 @@
 #if defined(_AIX)
 #include <sys/select.h>
 #endif
-#if defined(__hpux) || defined(UNIXWARE) || defined(__osf__) || defined(__digital__) || defined(sgi) || defined(__sgi) || defined(__sun) || defined(sun)
+#if defined(__hpux) || defined(UNIXWARE) || defined(OSR6) || defined(__osf__) || defined(__digital__) || defined(sgi) || defined(__sgi) || defined(__sun) || defined(sun)
 #include <netinet/in_systm.h>
 #endif
 #ifndef __VMS

@@ -175,6 +175,18 @@ To omit the `shell=` directive (required for sandboxed builds):
 make GFX=SDL3 NO_SHELL=1
 ```
 
+### Legacy Unix / X11
+
+`Makefile.x11` detects the OS from `uname` and picks the right target, so on
+Linux, Solaris, HP-UX, AIX, UnixWare, OpenServer 6, IRIX and Tru64 it is just:
+
+```
+make -f Makefile.x11
+```
+
+Named targets still work if the guess is wrong: `linux`, `solaris`, `hpux`,
+`hpux10`, `aix`, `unixware`, `osr6`, `osf1`, `irix`, `irix5`.
+
 ### macOS / Darwin
 
 ```
@@ -189,11 +201,7 @@ nmake -f Makefile.win32
 
 ### SCO OpenServer 6
 
-Builds with the bundled CCS 4.2 compiler and the stock `make`, no gcc needed:
-
-```
-make -f Makefile.x11 osr6
-```
+Builds with the bundled CCS 4.2 compiler and the stock `make`, no gcc needed.
 
 Notes: CPU and memory come from the MAS kernel metrics (`/var/adm/metreg.data`),
 swap from `swapctl()`, and `net=` from the DLPI statistics of `/dev/<ifname>` -

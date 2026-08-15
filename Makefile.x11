@@ -6,7 +6,23 @@ SOURCES = main.c graphics.c config.c plot.c ringbuf.c threading.c ini_parser.c d
 OBJECTS = $(SOURCES:.c=.o)
 TARGET = sng
 
-all: $(TARGET)
+# Auto detect OS
+all:
+	@s=`uname -s`; r=`uname -r`; v=`uname -v`; \
+	case "$$s" in \
+	  Linux)   t=linux;; \
+	  SunOS)   t=solaris;; \
+	  AIX)     t=aix;; \
+	  OSF1)    t=osf1;; \
+	  HP-UX)   case "$$r" in *.10.*) t=hpux10;; *) t=hpux;; esac;; \
+	  IRIX*)   case "$$r" in 5.*) t=irix5;; *) t=irix;; esac;; \
+	  UnixWare|UNIX_SV) t=unixware;; \
+	  SCO_SV)  case "$$v" in 6.*) t=osr6;; *) echo "OpenServer $$v is not supported"; exit 1;; esac;; \
+	  Darwin)  echo "use Makefile.macos on macOS"; exit 1;; \
+	  *) echo "$$s not known here, building with the defaults"; t=$(TARGET);; \
+	esac; \
+	echo "=> make $$t"; \
+	$(MAKE) -f Makefile.x11 $$t
 
 $(TARGET): $(OBJECTS)
 	$(CC) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
@@ -21,35 +37,35 @@ $(TARGET): $(OBJECTS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 linux:
-	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -DLINUX" LDFLAGS="-lX11 -lpthread -lm"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -DLINUX" LDFLAGS="-lX11 -lpthread -lm" $(TARGET)
 
 solaris:
-	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11" LDFLAGS="-lX11 -lpthread -lm -lsocket -lnsl -lrt -lkstat -lresolv"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11" LDFLAGS="-lX11 -lpthread -lm -lsocket -lnsl -lrt -lkstat -lresolv" $(TARGET)
 
 hpux:
-	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11" LDFLAGS="-L/usr/lib/X11R6 -lX11 -lpthread -lm -lnm"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11" LDFLAGS="-L/usr/lib/X11R6 -lX11 -lpthread -lm -lnm" $(TARGET)
 
 # 10.20 has no pthreads and no NMAPI: gcc -threads gives DCE/CMA (-lcma -lc_r)
 hpux10:
-	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -DHPUX10 -threads -include os/hpux10.h" LDFLAGS="-L/usr/lib/X11R6 -lX11 -lm -threads"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -DHPUX10 -threads -include os/hpux10.h" LDFLAGS="-L/usr/lib/X11R6 -lX11 -lm -threads" $(TARGET)
 
 aix:
-	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -pthread" LDFLAGS="-lX11 -pthread -lm"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -pthread" LDFLAGS="-lX11 -pthread -lm" $(TARGET)
 
 unixware:
-	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -DUNIXWARE" LDFLAGS="-lX11 -lthread -lm -lsocket -lnsl -lelf -lmas"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -DUNIXWARE" LDFLAGS="-lX11 -lthread -lm -lsocket -lnsl -lelf -lmas" $(TARGET)
 
 # SCO OpenServer 6: native CCS 4.2 cc, POSIX threads via -Kthread.
 osr6:
 	$(MAKE) -f Makefile.x11 CC=cc \
 	  CFLAGS="-O -Kthread -DGFX_X11 -DOSR6" \
-	  LDFLAGS="-Kthread -L/usr/X11R6/lib -lX11 -lsocket -lnsl -lmas -lelf -lm"
+	  LDFLAGS="-Kthread -L/usr/X11R6/lib -lX11 -lsocket -lnsl -lmas -lelf -lm" $(TARGET)
 
 osf1:
-	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -pthread" LDFLAGS="-lX11 -pthread -lm -lmach"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -pthread" LDFLAGS="-lX11 -pthread -lm -lmach" $(TARGET)
 
 irix:
-	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -isystem /usr/include -D__STDINT_H__" LDFLAGS="-lX11 -lpthread -lelf"
+	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -isystem /usr/include -D__STDINT_H__" LDFLAGS="-lX11 -lpthread -lelf" $(TARGET)
 
 # 5.3 predates socklen_t (sgi alone cannot gate it, 6.5 defines the type) and
 # has no pthreads: sproc + abi_mutex instead, so no -lpthread.

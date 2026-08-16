@@ -28,6 +28,54 @@ typedef struct {
 static plot_stats_t plot_stats_cache[32];
 static char system_hostname[256] = "";
 
+/* Mix fg over bg.  Used for the area under a trace, which is the accent color
+ * knocked back so the trace itself stays the brightest thing in the panel.
+ * Two colors per plot instead of a stipple pattern, which the renderer API
+ * does not have. */
+static color_t blend_color(color_t fg, color_t bg, int32_t pct) {
+    color_t c;
+    c.r = (uint8_t)((fg.r * pct + bg.r * (100 - pct)) / 100);
+    c.g = (uint8_t)((fg.g * pct + bg.g * (100 - pct)) / 100);
+    c.b = (uint8_t)((fg.b * pct + bg.b * (100 - pct)) / 100);
+    c.a = 255;
+    return c;
+}
+
+/* Round a scale maximum up to a readable number, so the axis says 400ms
+ * instead of 319.9ms. */
+static double nice_max(double v) {
+    static const double steps[] = {
+        1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0
+    };
+    double scale = 1.0, n;
+    int i;
+
+    if (v <= 0.0) return 1.0;
+
+    while (v / scale >= 10.0) scale *= 10.0;
+    while (v / scale < 1.0) scale /= 10.0;
+
+    n = v / scale;
+    for (i = 0; i < (int)(sizeof(steps) / sizeof(steps[0])); i++) {
+        if (n <= steps[i]) return steps[i] * scale;
+    }
+    return 10.0 * scale;
+}
+
+static void format_value(plot_t *plot, double value, char *buf, size_t size) {
+    const char *unit;
+
+    if (plot->data_source && plot->data_source->datasource &&
+        plot->data_source->datasource->handler->format_value) {
+        plot->data_source->datasource->handler->format_value(value, buf, size);
+        return;
+    }
+
+    unit = (plot->data_source && plot->data_source->datasource) ?
+           datasource_get_unit(plot->data_source->datasource) : "";
+    snprintf(buf, size, "%.1f%s", value, unit);
+}
+
 static void calculate_stats(plot_t *plot, data_source_t *data_source, uint32_t plot_index) {
     if (!plot) return;
 
@@ -51,9 +99,9 @@ static void calculate_stats(plot_t *plot, data_source_t *data_source, uint32_t p
 void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
                int32_t x, int32_t y, int32_t width, int32_t height, config_t *global_config, uint32_t plot_index,
                int32_t hover_x, int32_t hover_y) {
-    color_t border_color;
+    color_t border_color, line_color, fill_color;
     char title[256];
-    int32_t plot_y, plot_height;
+    int32_t plot_y, plot_height, footer_y;
     rect_t border_rect;
     char stats_text[128];
     double fixed_max_scale, max_val;
@@ -69,7 +117,7 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
     int32_t prev_out_x, prev_out_y;
     uint32_t i;
     double in_value, out_value;
-    int32_t plot_x, plot_bottom;
+    int32_t plot_x, plot_bottom, plot_top;
     int32_t in_bar_height, out_bar_height, out_y;
     double value;
     int32_t bar_height;
@@ -91,13 +139,25 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
     int32_t pixel_offset;
     int32_t plot_max_offset;
     uint32_t dual_count;
+    int32_t line_h, grid_i, grid_y;
+    int32_t prev_x, prev_y, swatch;
+    int retro;
 
     if (!plot || !renderer || !font) return;
-    
+
     calculate_stats(plot, plot->data_source, plot_index);
-    
+
+    retro = global_config->retro;
     border_color = global_config->border_color;
-    renderer_set_color(renderer, border_color);
+    line_color = plot->config->line_color;
+    /* Knock the area back further for pale accents, otherwise a plot that sits
+     * near its ceiling becomes a solid block with the trace lost inside it. */
+    grid_i = (line_color.r * 30 + line_color.g * 59 + line_color.b * 11) / 100;
+    fill_color = blend_color(line_color, global_config->panel_color,
+                             32 - (grid_i * 16) / 255);
+
+    font_get_text_size(font, "0", &text_width, &line_h);
+    if (line_h < 6) line_h = 6;
 
     snprintf(title, sizeof(title), "%s", plot->config->name);
     if (strstr(title, "local")) {
@@ -109,19 +169,38 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
         strcat(temp, local_pos + 5);
         snprintf(title, sizeof(title), "%s", temp);
     }
-    font_draw_text(renderer, font, global_config->text_color, x, y + 5, title);
-    
-    plot_y = y + 20;
-    plot_height = height - 40;
+    font_draw_text(renderer, font, global_config->text_color, x, y + 1, title);
+
+    plot_y = y + line_h + 4;
+    footer_y = y + height - line_h - 1;
+    plot_height = footer_y - plot_y - 3;
+    if (plot_height < 8) plot_height = 8;
+    plot_top = plot_y + 2;
+    plot_bottom = plot_y + plot_height - 2;
+
     border_rect.x = x;
     border_rect.y = plot_y;
     border_rect.w = width;
     border_rect.h = plot_height;
+    if (!retro) {
+        renderer_set_color(renderer, global_config->panel_color);
+        renderer_fill_rect(renderer, border_rect);
+
+        /* Horizontal guides at the quarters, so a trace can be read off the
+         * panel without hovering it. */
+        renderer_set_color(renderer, global_config->grid_color);
+        for (grid_i = 1; grid_i < 4; grid_i++) {
+            grid_y = plot_y + (plot_height * grid_i) / 4;
+            renderer_draw_line(renderer, x + 1, grid_y, x + width - 2, grid_y);
+        }
+    }
+
+    renderer_set_color(renderer, border_color);
     renderer_draw_rect(renderer, border_rect);
-    
+
     if (!plot->data_buffer || ringbuf_count(plot->data_buffer) == 0) {
         snprintf(stats_text, sizeof(stats_text), "No data");
-        font_draw_text(renderer, font, global_config->text_color, x, y + height - 15, stats_text);
+        font_draw_text(renderer, font, global_config->text_dim_color, x, footer_y, stats_text);
         return;
     }
 
@@ -165,6 +244,8 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
         }
         if (max_val <= 0.0)
             max_val = 1.0;
+        if (!retro)
+            max_val = nice_max(max_val);
     }
 
     if (plot->data_source && plot->data_source->datasource && plot->data_source->datasource->handler->format_value) {
@@ -180,78 +261,141 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
 
     font_get_text_size(font, scale_text, &scale_text_width, &scale_text_height);
     scale_x = x + width - scale_text_width;
-    font_draw_text(renderer, font, global_config->text_color, scale_x, y + 5, scale_text);
+    font_draw_text(renderer, font,
+                   retro ? global_config->text_color : global_config->text_dim_color,
+                   scale_x, y + 1, scale_text);
+
+    dual_count = (plot->is_dual && plot->data_buffer_secondary) ?
+                 ((data_count < data_count_secondary) ? data_count : data_count_secondary) :
+                 data_count;
+
+    /* Three passes over the samples, one color each, rather than switching the
+     * GC foreground per column - that matters over a slow X connection. */
+
+    renderer_set_color(renderer, global_config->error_line_color);
+    for (i = 0; i < dual_count; i++) {
+        if (temp_buffer[i] >= 0 &&
+            !(plot->is_dual && plot->data_buffer_secondary && temp_buffer_secondary[i] < 0))
+            continue;
+        pixel_offset = (int32_t)((now_ms - temp_timestamps[i]) / (uint32_t)refresh_interval);
+        if (pixel_offset < 0 || pixel_offset > plot_max_offset) continue;
+        plot_x = x + width - 2 - pixel_offset;
+        renderer_draw_line(renderer, plot_x, plot_top, plot_x, plot_bottom);
+    }
+
+    /* Retro fills the whole column in the one line color; otherwise the body is
+     * the knocked-back fill and only the top edge carries the trace. */
+    renderer_set_color(renderer, retro ? line_color : fill_color);
+    for (i = 0; i < dual_count; i++) {
+        value = temp_buffer[i];
+        if (value < 0) continue;
+        pixel_offset = (int32_t)((now_ms - temp_timestamps[i]) / (uint32_t)refresh_interval);
+        if (pixel_offset < 0 || pixel_offset > plot_max_offset) continue;
+        plot_x = x + width - 2 - pixel_offset;
+
+        bar_height = (int32_t)((value / max_val) * (plot_height - 4));
+        if (bar_height < 1) bar_height = 1;
+        if (bar_height > plot_height - 4) bar_height = plot_height - 4;
+        renderer_draw_line(renderer, plot_x, plot_bottom - bar_height + (retro ? 0 : 1),
+                           plot_x, plot_bottom);
+    }
+
+    if (!retro) {
+        renderer_set_color(renderer, line_color);
+        prev_x = prev_y = -1;
+        for (i = 0; i < dual_count; i++) {
+            value = temp_buffer[i];
+            pixel_offset = (int32_t)((now_ms - temp_timestamps[i]) / (uint32_t)refresh_interval);
+            if (value < 0 || pixel_offset < 0 || pixel_offset > plot_max_offset) {
+                prev_x = prev_y = -1;
+                continue;
+            }
+            plot_x = x + width - 2 - pixel_offset;
+
+            bar_height = (int32_t)((value / max_val) * (plot_height - 4));
+            if (bar_height < 1) bar_height = 1;
+            if (bar_height > plot_height - 4) bar_height = plot_height - 4;
+            in_bar_height = plot_bottom - bar_height;
+
+            if (prev_x >= 0)
+                renderer_draw_line(renderer, prev_x, prev_y, plot_x, in_bar_height);
+            else
+                renderer_draw_line(renderer, plot_x, in_bar_height, plot_x, in_bar_height);
+
+            prev_x = plot_x;
+            prev_y = in_bar_height;
+        }
+    }
 
     if (plot->is_dual && plot->data_buffer_secondary) {
-        prev_out_x = -1;
-        prev_out_y = -1;
-        dual_count = (data_count < data_count_secondary) ? data_count : data_count_secondary;
-
+        renderer_set_color(renderer, plot->config->line_color_secondary);
+        prev_out_x = prev_out_y = -1;
         for (i = 0; i < dual_count; i++) {
             in_value = temp_buffer[i];
             out_value = temp_buffer_secondary[i];
-
             pixel_offset = (int32_t)((now_ms - temp_timestamps[i]) / (uint32_t)refresh_interval);
-            if (pixel_offset < 0 || pixel_offset > plot_max_offset) {
+            if (in_value < 0 || out_value < 0 ||
+                pixel_offset < 0 || pixel_offset > plot_max_offset) {
                 prev_out_x = prev_out_y = -1;
                 continue;
             }
             plot_x = x + width - 2 - pixel_offset;
-            plot_bottom = plot_y + plot_height - 2;
 
-            if (in_value < 0 || out_value < 0) {
-                renderer_set_color(renderer, global_config->error_line_color);
-                renderer_draw_line(renderer, plot_x, plot_y + 2, plot_x, plot_bottom);
-                prev_out_x = prev_out_y = -1;
-            } else {
-                in_bar_height = (int32_t)((in_value / max_val) * (plot_height - 4));
-                if (in_bar_height < 1) in_bar_height = 1;
+            out_bar_height = (int32_t)((out_value / max_val) * (plot_height - 4));
+            if (out_bar_height > plot_height - 4) out_bar_height = plot_height - 4;
+            out_y = plot_bottom - out_bar_height;
 
-                renderer_set_color(renderer, plot->config->line_color);
-                renderer_draw_line(renderer, plot_x, plot_bottom - in_bar_height, plot_x, plot_bottom);
+            if (prev_out_x >= 0)
+                renderer_draw_line(renderer, prev_out_x, prev_out_y, plot_x, out_y);
+            else
+                renderer_draw_line(renderer, plot_x, out_y, plot_x, out_y);
 
-                out_bar_height = (int32_t)((out_value / max_val) * (plot_height - 4));
-                out_y = plot_bottom - out_bar_height;
-
-                renderer_set_color(renderer, plot->config->line_color_secondary);
-
-                if (prev_out_x >= 0 && prev_out_y >= 0) {
-                    renderer_draw_line(renderer, prev_out_x, prev_out_y, plot_x, out_y);
-                } else {
-                    renderer_draw_line(renderer, plot_x, out_y, plot_x, out_y);
-                }
-
-                prev_out_x = plot_x;
-                prev_out_y = out_y;
-            }
-        }
-    } else {
-        dual_count = data_count;
-        for (i = 0; i < data_count; i++) {
-            value = temp_buffer[i];
-
-            pixel_offset = (int32_t)((now_ms - temp_timestamps[i]) / (uint32_t)refresh_interval);
-            if (pixel_offset < 0 || pixel_offset > plot_max_offset) continue;
-            plot_x = x + width - 2 - pixel_offset;
-            plot_bottom = plot_y + plot_height - 2;
-
-            if (value < 0) {
-                renderer_set_color(renderer, global_config->error_line_color);
-                renderer_draw_line(renderer, plot_x, plot_y + 2, plot_x, plot_bottom);
-            } else {
-                bar_height = (int32_t)((value / max_val) * (plot_height - 4));
-                if (bar_height < 1) bar_height = 1;
-
-                renderer_set_color(renderer, plot->config->line_color);
-                renderer_draw_line(renderer, plot_x, plot_bottom - bar_height, plot_x, plot_bottom);
-            }
+            prev_out_x = plot_x;
+            prev_out_y = out_y;
         }
     }
-    
-    if (plot->data_source && plot->data_source->datasource && plot->data_source->datasource->handler->format_value) {
-        plot->data_source->datasource->handler->format_value(plot_stats_cache[plot_index].avg_value, avg_formatted, sizeof(avg_formatted));
-        plot->data_source->datasource->handler->format_value(plot_stats_cache[plot_index].last_value, last_formatted, sizeof(last_formatted));
-        if (plot->is_dual && plot->data_source->datasource->handler->format_dual_stats) {
+
+
+    format_value(plot, plot_stats_cache[plot_index].avg_value, avg_formatted, sizeof(avg_formatted));
+    format_value(plot, plot_stats_cache[plot_index].last_value, last_formatted, sizeof(last_formatted));
+
+    swatch = 0;
+    if (!retro && plot->is_dual && plot->data_buffer_secondary) {
+        swatch = line_h - 6;
+        if (swatch < 3) swatch = 3;
+    }
+
+    /* Dual plots read as a legend: a swatch in front of each series value, so
+     * which color is which is obvious without a key elsewhere. */
+    if (swatch) {
+        format_value(plot, plot_stats_cache[plot_index].last_value_secondary,
+                     formatted, sizeof(formatted));
+        font_get_text_size(font, last_formatted, &text_width, &text_height);
+        font_get_text_size(font, formatted, &scale_text_width, &scale_text_height);
+        text_x = x + width - (2 * swatch + text_width + scale_text_width + 16);
+    }
+
+    if (swatch && text_x > x) {
+        border_rect.y = footer_y + 3;
+        border_rect.w = swatch;
+        border_rect.h = swatch;
+
+        border_rect.x = text_x;
+        renderer_set_color(renderer, line_color);
+        renderer_fill_rect(renderer, border_rect);
+        font_draw_text(renderer, font, line_color, text_x + swatch + 4, footer_y,
+                       last_formatted);
+
+        border_rect.x = text_x + swatch + 4 + text_width + 8;
+        renderer_set_color(renderer, plot->config->line_color_secondary);
+        renderer_fill_rect(renderer, border_rect);
+        font_draw_text(renderer, font, plot->config->line_color_secondary,
+                       border_rect.x + swatch + 4, footer_y, formatted);
+    } else {
+        /* Too narrow to split, fall back to the combined reading. */
+        swatch = 0;
+        if (plot->is_dual && plot->data_source && plot->data_source->datasource &&
+            plot->data_source->datasource->handler->format_dual_stats) {
             plot->data_source->datasource->handler->format_dual_stats(
                 plot_stats_cache[plot_index].last_value,
                 plot_stats_cache[plot_index].last_value_secondary,
@@ -259,24 +403,12 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
         } else {
             snprintf(stats_text, sizeof(stats_text), "%s", last_formatted);
         }
-    } else {
-        if (plot->data_source && plot->data_source->datasource) {
-            unit = datasource_get_unit(plot->data_source->datasource);
-        } else {
-            unit = "";
-        }
-        if (strlen(unit) > 0) {
-            snprintf(stats_text, sizeof(stats_text), "%.1f%s",
-                     plot_stats_cache[plot_index].last_value, unit);
-        } else {
-            snprintf(stats_text, sizeof(stats_text), "%.1f",
-                     plot_stats_cache[plot_index].last_value);
-        }
-    }
 
-    font_get_text_size(font, stats_text, &text_width, &text_height);
-    text_x = x + width - text_width;
-    font_draw_text(renderer, font, global_config->text_color, text_x, y + height - 15, stats_text);
+        font_get_text_size(font, stats_text, &text_width, &text_height);
+        text_x = x + width - text_width;
+        font_draw_text(renderer, font, retro ? global_config->text_color : line_color,
+                       text_x, footer_y, stats_text);
+    }
 
     buffer_size = plot->data_buffer->size;
     total_time_ms = buffer_size * (uint32_t)refresh_interval;
@@ -295,7 +427,21 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
         snprintf(time_span_text, sizeof(time_span_text), "%ud", days);
     }
 
-    font_draw_text(renderer, font, global_config->text_color, x, y + height - 15, time_span_text);
+    font_draw_text(renderer, font,
+                   retro ? global_config->text_color : global_config->text_dim_color,
+                   x, footer_y, time_span_text);
+
+    /* The average has been computed all along and never shown; it fits in the
+     * gap between the time span and the current reading. */
+    if (!retro) {
+        snprintf(temp, sizeof(temp), "avg %s", avg_formatted);
+        font_get_text_size(font, temp, &scale_text_width, &scale_text_height);
+        font_get_text_size(font, time_span_text, &text_width, &text_height);
+        scale_x = x + (width - scale_text_width) / 2;
+        if (scale_x > x + text_width + 8 && scale_x + scale_text_width < text_x - 8)
+            font_draw_text(renderer, font, global_config->text_dim_color, scale_x,
+                           footer_y, temp);
+    }
 
     if (hover_x >= x && hover_x < x + width && hover_y >= plot_y && hover_y < plot_y + plot_height) {
         int32_t guide_x, guide_top, guide_bottom;
@@ -315,10 +461,10 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
         char value_text[64];
 
         guide_x = hover_x;
-        guide_top = plot_y + 2;
-        guide_bottom = plot_y + plot_height - 2;
+        guide_top = plot_top;
+        guide_bottom = plot_bottom;
 
-        renderer_set_color(renderer, border_color);
+        renderer_set_color(renderer, retro ? border_color : global_config->text_dim_color);
         renderer_draw_line(renderer, guide_x, guide_top, guide_x, guide_bottom);
 
         hover_found = 0;
@@ -372,20 +518,38 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
             snprintf(hover_text, sizeof(hover_text), "%s - %s", value_text, time_text);
             font_get_text_size(font, hover_text, &hover_text_width, &hover_text_height);
 
-            hover_text_x = guide_x + 5;
-            if (hover_text_x + hover_text_width > x + width) {
-                hover_text_x = guide_x - hover_text_width - 5;
+            hover_text_x = guide_x + 6;
+            if (hover_text_x + hover_text_width + 4 > x + width) {
+                hover_text_x = guide_x - hover_text_width - 6;
             }
-            if (hover_text_x < x) {
-                hover_text_x = x;
+            if (hover_text_x < x + 2) {
+                hover_text_x = x + 2;
             }
 
             hover_text_y = hover_y - hover_text_height - 5;
-            if (hover_text_y < plot_y) {
+            if (hover_text_y < plot_top) {
                 hover_text_y = hover_y + 5;
             }
+            if (hover_text_y + hover_text_height > plot_bottom) {
+                hover_text_y = plot_bottom - hover_text_height;
+            }
 
-            font_draw_text(renderer, font, border_color, hover_text_x, hover_text_y, hover_text);
+            /* Opaque backing, otherwise the readout sits on top of the trace
+             * and neither can be read. */
+            if (!retro) {
+                border_rect.x = hover_text_x - 3;
+                border_rect.y = hover_text_y - 1;
+                border_rect.w = hover_text_width + 6;
+                border_rect.h = hover_text_height + 2;
+                renderer_set_color(renderer, global_config->background_color);
+                renderer_fill_rect(renderer, border_rect);
+                renderer_set_color(renderer, global_config->grid_color);
+                renderer_draw_rect(renderer, border_rect);
+            }
+
+            font_draw_text(renderer, font,
+                           retro ? border_color : global_config->text_color,
+                           hover_text_x, hover_text_y, hover_text);
         }
     }
 }

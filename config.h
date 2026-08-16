@@ -23,7 +23,10 @@ typedef enum {
 
 typedef struct {
     color_t background_color;
+    color_t panel_color;
+    color_t grid_color;
     color_t text_color;
+    color_t text_dim_color;
     color_t border_color;
     color_t line_color;
     color_t line_color_secondary;
@@ -35,6 +38,7 @@ typedef struct {
     int32_t max_fps;
     fullscreen_mode_t fullscreen;
     int fps_counter;
+    int retro;
     float font_size;
     char *font_name;
     int http_enabled;
@@ -47,5 +51,6 @@ typedef struct {
 config_t *config_load(const char *filename);
 void config_destroy(config_t *config);
 int config_get_max_fps(void);
+void config_force_retro(int on);
 
 #endif

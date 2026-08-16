@@ -52,8 +52,12 @@ int main(int argc, char *argv[]) {
                 http_port = atoi(argv[i + 1]);
                 i++;
             }
+        } else if (strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--retro") == 0) {
+            config_force_retro(1);
+        } else if (strcmp(argv[i], "-n") == 0 || strcmp(argv[i], "--no-retro") == 0) {
+            config_force_retro(0);
         } else {
-            fprintf(stderr, "Usage: %s [-v] [-f config_file] [-w [port]]\n", argv[0]);
+            fprintf(stderr, "Usage: %s [-v] [-f config_file] [-w [port]] [-r|-n]\n", argv[0]);
             return 1;
         }
     }

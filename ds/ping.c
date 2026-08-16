@@ -18,7 +18,7 @@ typedef struct {
     int permanent_error;
     double min;
     double max;
-    uint64_t sum;
+    double sum;
     uint32_t sample_count;
     double last;
     double prev_ping;
@@ -50,7 +50,7 @@ static int ping_init(const char *target, void **context) {
     ctx->permanent_error = 0;
     ctx->min = 10000.0;
     ctx->max = 0.0;
-    ctx->sum = 0;
+    ctx->sum = 0.0;
     ctx->sample_count = 0;
     ctx->last = 0.0;
     ctx->prev_ping = 0.0;
@@ -122,7 +122,7 @@ static int ping_collect_internal(ping_context_t *ctx, double *value) {
 
     if (*value < ctx->min) ctx->min = *value;
     if (*value > ctx->max) ctx->max = *value;
-    ctx->sum += (uint64_t)*value;
+    ctx->sum += *value;
     ctx->last = *value;
     ctx->sample_count++;
 
@@ -181,7 +181,7 @@ static int ping_get_stats(void *context, datasource_stats_t *stats) {
 
     stats->min = ctx->min;
     stats->max = ctx->max;
-    stats->avg = (double)(ctx->sum / ctx->sample_count);
+    stats->avg = ctx->sum / ctx->sample_count;
     stats->last = ctx->last;
 
     if (ctx->jitter_count == 0) {

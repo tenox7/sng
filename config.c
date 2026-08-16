@@ -15,12 +15,30 @@
 #endif
 
 static config_t *global_config = NULL;
+static int forced_retro = -1;       /* -1 = follow the config file */
+
+void config_force_retro(int on) {
+    forced_retro = on ? 1 : 0;
+}
 
 static color_t mk_color(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
     color_t c;
     c.r = r; c.g = g; c.b = b; c.a = a;
     return c;
 }
+
+/* Muted accents, kept few so an 8 bit colormap can still hold them all. */
+#define ACCENT_COUNT 8
+static const color_t accent_palette[ACCENT_COUNT] = {
+    { 0x4c, 0xd3, 0x8a, 0xff },     /* green  */
+    { 0x4f, 0xc3, 0xf7, 0xff },     /* cyan   */
+    { 0xff, 0xb7, 0x4d, 0xff },     /* orange */
+    { 0xb3, 0x9d, 0xdb, 0xff },     /* violet */
+    { 0xff, 0xe0, 0x82, 0xff },     /* yellow */
+    { 0x79, 0x86, 0xcb, 0xff },     /* blue   */
+    { 0xf0, 0x62, 0x92, 0xff },     /* pink   */
+    { 0x9c, 0xcc, 0x65, 0xff }      /* lime   */
+};
 
 static char *create_default_config_file(const char *path) {
     static char config_path[512];
@@ -214,10 +232,13 @@ config_t *config_load(const char *filename) {
     char *section_name;
     char *platform_config_path;
     const char *create_path;
+    int line_color_explicit, line_color2_explicit;
 
     ini = ini_parse_file(filename);
     config_path = NULL;
     use_defaults = 0;
+    line_color_explicit = 0;
+    line_color2_explicit = 0;
     platform_config_path = os_get_config_path(filename);
 
     if (!ini) {
@@ -255,12 +276,36 @@ config_t *config_load(const char *filename) {
         return NULL;
     }
     
-    config->background_color = mk_color(100, 100, 100, 255);
-    config->text_color = mk_color(255, 255, 255, 255);
-    config->border_color = mk_color(255, 255, 255, 255);
-    config->line_color = mk_color(0, 255, 0, 255);
-    config->line_color_secondary = mk_color(0, 0, 255, 255);
-    config->error_line_color = mk_color(255, 0, 0, 255);
+    /* Decided before the palette, since it picks which palette is the default. */
+    config->retro = 0;
+    if ((value = ini_get_value(ini, "global", "retro"))) {
+        config->retro = (strcmp(value, "1") == 0 || strcmp(value, "true") == 0);
+    }
+    if (forced_retro >= 0) {
+        config->retro = forced_retro;
+    }
+
+    if (config->retro) {
+        config->background_color = mk_color(100, 100, 100, 255);
+        config->panel_color = mk_color(100, 100, 100, 255);
+        config->grid_color = mk_color(255, 255, 255, 255);
+        config->text_color = mk_color(255, 255, 255, 255);
+        config->text_dim_color = mk_color(255, 255, 255, 255);
+        config->border_color = mk_color(255, 255, 255, 255);
+        config->line_color = mk_color(0, 255, 0, 255);
+        config->line_color_secondary = mk_color(255, 128, 0, 255);
+        config->error_line_color = mk_color(255, 0, 0, 255);
+    } else {
+        config->background_color = mk_color(0x0d, 0x11, 0x17, 255);
+        config->panel_color = mk_color(0x16, 0x1c, 0x24, 255);
+        config->grid_color = mk_color(0x2c, 0x37, 0x42, 255);
+        config->text_color = mk_color(0xdb, 0xe4, 0xee, 255);
+        config->text_dim_color = mk_color(0x8b, 0x98, 0xa6, 255);
+        config->border_color = mk_color(0x2c, 0x37, 0x42, 255);
+        config->line_color = mk_color(0x4c, 0xd3, 0x8a, 255);
+        config->line_color_secondary = mk_color(0x4f, 0xc3, 0xf7, 255);
+        config->error_line_color = mk_color(0xef, 0x53, 0x50, 255);
+    }
     config->default_height = 80;
     config->default_width = 300;
     config->refresh_interval_ms = 10000;
@@ -278,17 +323,28 @@ config_t *config_load(const char *filename) {
     if ((value = ini_get_value(ini, "global", "background_color"))) {
         config->background_color = parse_color(value);
     }
+    if ((value = ini_get_value(ini, "global", "panel_color"))) {
+        config->panel_color = parse_color(value);
+    }
+    if ((value = ini_get_value(ini, "global", "grid_color"))) {
+        config->grid_color = parse_color(value);
+    }
     if ((value = ini_get_value(ini, "global", "text_color"))) {
         config->text_color = parse_color(value);
+    }
+    if ((value = ini_get_value(ini, "global", "text_dim_color"))) {
+        config->text_dim_color = parse_color(value);
     }
     if ((value = ini_get_value(ini, "global", "border_color"))) {
         config->border_color = parse_color(value);
     }
     if ((value = ini_get_value(ini, "global", "line_color"))) {
         config->line_color = parse_color(value);
+        line_color_explicit = 1;
     }
     if ((value = ini_get_value(ini, "global", "line_color_secondary"))) {
         config->line_color_secondary = parse_color(value);
+        line_color2_explicit = 1;
     }
     if ((value = ini_get_value(ini, "global", "error_line_color"))) {
         config->error_line_color = parse_color(value);
@@ -378,9 +434,21 @@ config_t *config_load(const char *filename) {
         }
     }
     
+    /* Unless the user picked a line color, give every plot its own accent so a
+     * stack of graphs reads as separate things rather than one green wall. */
+    if (!line_color_explicit && !config->retro) {
+        for (j = 0; j < plot_count; j++) {
+            plots[j].line_color = accent_palette[j % ACCENT_COUNT];
+            /* +3 rather than +1 so the two traces of a dual plot never end up
+             * as neighbouring hues */
+            if (!line_color2_explicit)
+                plots[j].line_color_secondary = accent_palette[(j + 3) % ACCENT_COUNT];
+        }
+    }
+
     for (i = 0; i < ini->section_count; i++) {
         section_name = ini->sections[i].section;
-        
+
         if (strcmp(section_name, "global") == 0 || strcmp(section_name, "targets") == 0) {
             continue;
         }

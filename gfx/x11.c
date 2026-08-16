@@ -100,6 +100,46 @@ static unsigned long x11_create_color_cached(x11_window_context_t *ctx, color_t 
         return xcolor.pixel;
     }
 
+    /* Colormap is full, which is normal on an 8 bit display once the desktop
+     * has taken its share.  Settle for the closest color already in it rather
+     * than dropping the whole palette to black and white. */
+    if (DefaultDepth(ctx->display, ctx->screen) <= 8) {
+        static XColor cmap_entry[256];
+        static int cmap_size = -1;
+        long dr, dg, db, dist, best_dist = 0;
+        int best = -1;
+
+        if (cmap_size < 0) {
+            cmap_size = 1 << DefaultDepth(ctx->display, ctx->screen);
+            if (cmap_size > 256) cmap_size = 256;
+            for (i = 0; i < cmap_size; i++)
+                cmap_entry[i].pixel = i;
+            XQueryColors(ctx->display, colormap, cmap_entry, cmap_size);
+        }
+
+        for (i = 0; i < cmap_size; i++) {
+            dr = (long)(cmap_entry[i].red >> 8) - (long)color.r;
+            dg = (long)(cmap_entry[i].green >> 8) - (long)color.g;
+            db = (long)(cmap_entry[i].blue >> 8) - (long)color.b;
+            dist = dr * dr + dg * dg + db * db;
+            if (best < 0 || dist < best_dist) {
+                best = i;
+                best_dist = dist;
+            }
+        }
+
+        if (best >= 0) {
+            if (ctx->color_cache_count < COLOR_CACHE_SIZE) {
+                ctx->color_cache[ctx->color_cache_count].r = color.r;
+                ctx->color_cache[ctx->color_cache_count].g = color.g;
+                ctx->color_cache[ctx->color_cache_count].b = color.b;
+                ctx->color_cache[ctx->color_cache_count].pixel = cmap_entry[best].pixel;
+                ctx->color_cache_count++;
+            }
+            return cmap_entry[best].pixel;
+        }
+    }
+
     brightness = (color.r + color.g + color.b) / 3;
     if (brightness < 128) {
         return BlackPixel(ctx->display, ctx->screen);

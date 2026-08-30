@@ -145,7 +145,7 @@ int os_memory_get_stats_dual(double *used_value, double *swap_value) {
     vm_statistics_data_t vmstats;
     uint64_t total_pages, used_pages;
 #ifdef TBL_SWAPINFO
-    struct swapinfo swi;
+    struct tbl_swapinfo swi;
     uint64_t swap_total, swap_free;
     int i;
 #endif
@@ -169,8 +169,8 @@ int os_memory_get_stats_dual(double *used_value, double *swap_value) {
     swap_total = 0;
     swap_free = 0;
     for (i = 0; table(TBL_SWAPINFO, i, &swi, 1, sizeof(swi)) > 0; i++) {
-        swap_total += (uint64_t)swi.si_swapsize;
-        swap_free += (uint64_t)swi.si_free;
+        swap_total += (uint64_t)swi.size;
+        swap_free += (uint64_t)swi.free;
     }
     if (swap_total > 0 && swap_free <= swap_total) {
         *swap_value = (double)(swap_total - swap_free) / (double)swap_total * 100.0;

@@ -71,8 +71,12 @@ osr6:
 	  CFLAGS="-O -Kthread -DGFX_X11 -DOSR6" \
 	  LDFLAGS="-Kthread -L/usr/X11R6/lib -lX11 -lsocket -lnsl -lmas -lelf -lm" $(TARGET)
 
+# Compaq C defaults to K&R mode on V4.0, where a # that is not in column 1 is
+# ignored, which drops the indented directives in compat.h.  -std is DEC C's
+# relaxed ANSI mode.  vm_statistics() lives in libmach, not libc.
 osf1:
-	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -pthread" LDFLAGS="-lX11 -pthread -lm -lmach" $(TARGET)
+	$(MAKE) -f Makefile.x11 CC=cc CFLAGS="-std -O2 -DGFX_X11 -pthread" \
+	  LDFLAGS="-lX11 -pthread -lm -lmach" $(TARGET)
 
 irix:
 	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11 -isystem /usr/include -D__STDINT_H__" LDFLAGS="-lX11 -lpthread -lelf" $(TARGET)

@@ -44,6 +44,9 @@ static char *create_default_config_file(const char *path) {
     static char config_path[512];
     FILE *f;
     char defgw_buf[64];
+#ifndef DS_MINIMAL
+    uint32_t in_bytes, out_bytes;
+#endif
 
     strncpy(config_path, path, sizeof(config_path) - 1);
     config_path[sizeof(config_path) - 1] = '\0';
@@ -55,7 +58,12 @@ static char *create_default_config_file(const char *path) {
         fprintf(f, "%s", DEFAULT_CONFIG_DEFGW);
     }
     fprintf(f, "%s", DEFAULT_CONFIG_TAIL);
-    fprintf(f, "%s", DEFAULT_CONFIG_NET);
+#ifndef DS_MINIMAL
+    /* only platforms whose os layer can enumerate interfaces answer "all" */
+    if (os_get_interface_stats("all", &in_bytes, &out_bytes)) {
+        fprintf(f, "net=local,all\n");
+    }
+#endif
     fclose(f);
 
     return config_path;

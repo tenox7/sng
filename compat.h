@@ -48,6 +48,28 @@
   #endif
 #elif defined(__VMS)
   #include <inttypes.h>
+/* Must precede the C99 test below: Compaq C V6.5 on Tru64 V5.1 reports
+ * __STDC_VERSION__ 199901L under -std, but no Tru64 release ships
+ * stdint.h.  The V4.0 compiler reported less and fell through here. */
+#elif defined(__osf__) || defined(__digital__) || defined(__DECC)
+  #include <sys/types.h>
+  typedef unsigned char uint8_t;
+  typedef unsigned short uint16_t;
+  typedef unsigned int uint32_t;
+  typedef unsigned long uint64_t;
+  typedef signed char int8_t;
+  typedef short int16_t;
+  typedef int int32_t;
+  typedef long int64_t;
+  #ifndef UINT32_MAX
+    #define UINT32_MAX 4294967295U
+  #endif
+  #ifndef INT32_MAX
+    #define INT32_MAX 2147483647
+  #endif
+  #ifndef INT32_MIN
+    #define INT32_MIN (-2147483647-1)
+  #endif
 #elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
   #include <stdint.h>
 #elif defined(_AIX)
@@ -82,25 +104,6 @@
 #elif defined(sgi)
   #include <sys/types.h>
   #include <inttypes.h>
-#elif defined(__osf__) || defined(__digital__) || defined(__DECC)
-  #include <sys/types.h>
-  typedef unsigned char uint8_t;
-  typedef unsigned short uint16_t;
-  typedef unsigned int uint32_t;
-  typedef unsigned long uint64_t;
-  typedef signed char int8_t;
-  typedef short int16_t;
-  typedef int int32_t;
-  typedef long int64_t;
-  #ifndef UINT32_MAX
-    #define UINT32_MAX 4294967295U
-  #endif
-  #ifndef INT32_MAX
-    #define INT32_MAX 2147483647
-  #endif
-  #ifndef INT32_MIN
-    #define INT32_MIN (-2147483647-1)
-  #endif
 #else
   #include <stdint.h>
 #endif

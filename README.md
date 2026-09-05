@@ -114,7 +114,8 @@ You can also specify the location with `-f /full/path/to/sng.ini`
 - `net=local,<interface>` - local interface throughput (e.g., `net=local,eth0`)
 - `net=local,all` - sum of throughput across every non-loopback interface. Bridge and VM/container
   members are counted alongside their parent, so bridged traffic shows up more than once.
-  Not available on HP-UX 10.20, Tru64, IRIX 5 or VMS
+  Not available on HP-UX 10.20, IRIX 5 or VMS. On Tru64 it reads the counters
+  out of `/dev/kmem`, which needs root or `chgrp mem sng; chmod 2755 sng`
 - `net=snmp1,<host>,<community>,<ifidx>` - SNMP bandwidth (e.g., `net=snmp1,192.168.1.1,public,7`)
 - `bw=` - legacy alias for `net=`, still accepted in existing config files
 - `cpu=local` - CPU usage percentage

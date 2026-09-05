@@ -13,6 +13,8 @@ struct plot_thread_t {
 #include <mach.h>
 #include <mach/mach_types.h>
 #include <mach/vm_statistics.h>
+#include <fcntl.h>
+#include <nlist.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/time.h>
@@ -205,8 +207,98 @@ int os_loadavg_get_stats(double *value) {
     return 1;
 }
 
+/* The interface counters have no system call of their own, so they are read
+ * out of /dev/kmem by walking the kernel ifnet chain from the address nlist()
+ * resolves in /vmunix. That device is mode 0440 root:mem, so this needs root
+ * or the binary installed setgid mem. */
+static int kmem_fd = -1;
+
+static unsigned long kmem_symbol(const char *name) {
+    struct nlist nl[2];
+
+    memset(nl, 0, sizeof(nl));
+    nl[0].n_name = (char *)name;
+
+    if (nlist("/vmunix", nl) < 0)
+        return 0;
+
+    return (unsigned long)nl[0].n_value;
+}
+
+static int kmem_read(unsigned long addr, void *buf, int size) {
+    if (addr == 0)
+        return 0;
+
+    if (kmem_fd < 0) {
+        kmem_fd = open("/dev/kmem", O_RDONLY);
+        if (kmem_fd < 0)
+            return 0;
+    }
+
+    if (lseek(kmem_fd, (off_t)addr, SEEK_SET) == (off_t)-1)
+        return 0;
+
+    return read(kmem_fd, buf, size) == size;
+}
+
 int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint32_t* out_bytes) {
-    return 0;
+    static unsigned long ifnet_addr = 0;
+    static int first_time = 1;
+    unsigned long ifnetaddr;
+    struct ifnet ifnet_buf;
+    char name_buf[16];
+    char ifname_full[32];
+    int all;
+    uint32_t sum_in = 0, sum_out = 0;
+    int found = 0;
+
+    if (!interface_name || !in_bytes || !out_bytes) {
+        return 0;
+    }
+
+    all = IF_IS_ALL(interface_name);
+
+    if (first_time) {
+        ifnet_addr = kmem_symbol("ifnet");
+        first_time = 0;
+    }
+
+    if (!kmem_read(ifnet_addr, &ifnetaddr, sizeof(ifnetaddr))) {
+        return 0;
+    }
+
+    while (ifnetaddr) {
+        if (!kmem_read(ifnetaddr, &ifnet_buf, sizeof(ifnet_buf))) {
+            break;
+        }
+
+        if (!kmem_read((unsigned long)ifnet_buf.if_name, name_buf, sizeof(name_buf))) {
+            break;
+        }
+
+        name_buf[sizeof(name_buf)-1] = '\0';
+        snprintf(ifname_full, sizeof(ifname_full), "%s%d", name_buf, ifnet_buf.if_unit);
+
+        if (all) {
+            if (!IF_IS_LOOPBACK(ifname_full)) {
+                sum_in += (uint32_t)ifnet_buf.if_ibytes;
+                sum_out += (uint32_t)ifnet_buf.if_obytes;
+                found = 1;
+            }
+        } else if (strcmp(ifname_full, interface_name) == 0) {
+            *in_bytes = (uint32_t)ifnet_buf.if_ibytes;
+            *out_bytes = (uint32_t)ifnet_buf.if_obytes;
+            return 1;
+        }
+
+        ifnetaddr = (unsigned long)ifnet_buf.if_next;
+    }
+
+    if (!found) return 0;
+
+    *in_bytes = sum_in;
+    *out_bytes = sum_out;
+    return 1;
 }
 
 void os_sleep(uint32_t milliseconds) {

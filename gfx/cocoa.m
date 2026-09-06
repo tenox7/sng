@@ -27,6 +27,7 @@ static int32_t mouse_y = 0;
 static uint32_t frame_count = 0;
 static double fps_last_time = 0.0;
 static float current_fps = 0.0f;
+static NSAutoreleasePool *frame_pool = nil;
 
 @interface SNGView : NSView {
     NSImage *backing;
@@ -565,7 +566,6 @@ int graphics_poll_events(void) {
 }
 
 int graphics_wait_events(void) {
-    NSAutoreleasePool *pool;
     NSEvent *event;
     int fps;
     NSDate *until;
@@ -573,7 +573,9 @@ int graphics_wait_events(void) {
     fps = config_get_max_fps();
     if (fps <= 0) fps = 1;
 
-    pool = [[NSAutoreleasePool alloc] init];
+    /* spans the whole frame: plot_system_update draws after this returns */
+    [frame_pool release];
+    frame_pool = [[NSAutoreleasePool alloc] init];
     until = [NSDate dateWithTimeIntervalSinceNow:1.0 / (double)fps];
     event = [NSApp nextEventMatchingMask:NSEventMaskAny
                                untilDate:until
@@ -583,7 +585,6 @@ int graphics_wait_events(void) {
         [NSApp sendEvent:event];
         pump_pending();
     }
-    [pool release];
 
     if (pending_event.type == GRAPHICS_EVENT_QUIT) return 0;
     return 1;

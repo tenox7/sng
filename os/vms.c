@@ -4,8 +4,9 @@
  * uses timespec arithmetic only - VAX has no 64-bit integers.
  * Ping via unix-ping.c raw ICMP sockets (needs SYSPRV).
  * CPU: wildcard $GETJPI scan summing per-process CPUTIM deltas.
- * Memory (VAX): free/modified list cells read directly - the image
- * must link against SYS$SYSTEM:SYS.STB (see sng.opt).
+ * Memory: free/modified list sizes - VAX reads the executive cells (the
+ * image links against SYS$SYSTEM:SYS.STB, see sng_vax.opt), Alpha/I64
+ * use $GETRMI.
  * Loadavg/interface stats not implemented yet. */
 #include "os_interface.h"
 
@@ -28,6 +29,10 @@ struct plot_thread_t {
 #include <syidef.h>
 #include <jpidef.h>
 #include <starlet.h>
+#ifndef __VAX
+#include <rmidef.h>
+#include <efndef.h>
+#endif
 
 typedef struct {
     unsigned short buflen;
@@ -175,10 +180,44 @@ int os_cpu_get_stats(double *value) {
     return 1;
 }
 
-/* No Unix-style page cache to subtract: memory is in working sets, the free
- * list, or the modified list. Free plus modified is what can be handed out. */
-int os_memory_get_stats_dual(double *used_value, double *swap_value) {
+/* Free plus modified pages are what can be handed out. VAX reads the
+ * scheduler cells directly (needs SYS.STB); Alpha/I64 get the same two
+ * numbers from $GETRMI, which needs no symbol table. */
+static int vms_avail_pages(unsigned int *avail) {
 #ifdef __VAX
+    *avail = sch$gl_freecnt + sch$gl_mfycnt;
+    return 1;
+#else
+    unsigned int frlist = 0, modlist = 0, status;
+    unsigned short frlen = 0, modlen = 0;
+    vms_item_t items[3];
+    vms_iosb_t iosb;
+
+    items[0].buflen = sizeof(frlist);
+    items[0].itmcod = RMI$_FRLIST;
+    items[0].bufadr = &frlist;
+    items[0].retlen = &frlen;
+    items[1].buflen = sizeof(modlist);
+    items[1].itmcod = RMI$_MODLIST;
+    items[1].bufadr = &modlist;
+    items[1].retlen = &modlen;
+    items[2].buflen = 0;
+    items[2].itmcod = 0;
+    items[2].bufadr = 0;
+    items[2].retlen = 0;
+
+    status = sys$getrmi(EFN$C_ENF, 0, 0, items, &iosb, 0, 0);
+    if (status & 1) status = sys$synch(EFN$C_ENF, &iosb);
+    if (!(status & 1) || !(iosb.sts & 1)) return 0;
+
+    *avail = frlist + modlist;
+    return 1;
+#endif
+}
+
+/* No Unix-style page cache to subtract: memory is in working sets, the free
+ * list, or the modified list. */
+int os_memory_get_stats_dual(double *used_value, double *swap_value) {
     static unsigned int memsize = 0;
     unsigned int avail, pgfl_total, pgfl_free;
 
@@ -189,7 +228,7 @@ int os_memory_get_stats_dual(double *used_value, double *swap_value) {
         if (memsize == 0) return 0;
     }
 
-    avail = sch$gl_freecnt + sch$gl_mfycnt;
+    if (!vms_avail_pages(&avail)) return 0;
     if (avail > memsize) avail = memsize;
 
     *used_value = 100.0 * (double)(memsize - avail) / (double)memsize;
@@ -208,12 +247,6 @@ int os_memory_get_stats_dual(double *used_value, double *swap_value) {
 #endif
 
     return 1;
-#else
-    /* Alpha/I64: use SYI$_FREE_PAGE_COUNT when that port happens */
-    (void)used_value;
-    (void)swap_value;
-    return 0;
-#endif
 }
 
 int os_memory_get_stats(double *value) {

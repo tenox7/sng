@@ -1,6 +1,7 @@
 $! SNG build procedure for OpenVMS (DECwindows X11)
 $! Datasources: clock, tcp, snmp, ping (raw ICMP - needs SYSPRV),
-$! cpu ($GETJPI scan), memory (VAX scheduler cells via SYS.STB).
+$! cpu ($GETJPI scan), memory (VAX: scheduler cells via SYS.STB,
+$! Alpha/I64: $GETRMI).
 $! Still stubbed: loadavg, if_thr.
 $! NO_SHELL: shell ds needs select() on pipes and usleep - not on VMS.
 $!
@@ -31,6 +32,7 @@ $ CC 'CFLAGS' RINGBUF.C
 $ CC 'CFLAGS' THREADING.C
 $ CC 'CFLAGS' INI_PARSER.C
 $ CC 'CFLAGS' DATASOURCE.C
+$ CC 'CFLAGS' HTTPD.C
 $ CC 'CFLAGS' [.DS]CLOCK.C /OBJECT=CLOCK.OBJ
 $ CC 'CFLAGS' [.DS]TCP.C /OBJECT=TCP.OBJ
 $ CC 'CFLAGS' [.DS]SNMP.C /OBJECT=SNMP.OBJ
@@ -42,13 +44,15 @@ $ CC 'CFLAGS' [.DS]LOADAVG.C /OBJECT=LOADAVG.OBJ
 $ CC 'CFLAGS' [.DS]IF_THR.C /OBJECT=IF_THR.OBJ
 $ CC 'CFLAGS' [.OS]OS.C /OBJECT=OS.OBJ
 $!
+$ OPTS = "SNG.OPT/OPTIONS"
+$ IF F$GETSYI("ARCH_NAME") .EQS. "VAX" THEN OPTS = OPTS + ", SNG_VAX.OPT/OPTIONS"
 $ SAY "Linking..."
 $ LINK /EXECUTABLE=SNG.EXE -
     MAIN.OBJ, GRAPHICS.OBJ, CONFIG.OBJ, PLOT.OBJ, RINGBUF.OBJ, -
-    THREADING.OBJ, INI_PARSER.OBJ, DATASOURCE.OBJ, CLOCK.OBJ, -
+    THREADING.OBJ, INI_PARSER.OBJ, DATASOURCE.OBJ, HTTPD.OBJ, CLOCK.OBJ, -
     TCP.OBJ, SNMP.OBJ, SNMP_CLIENT.OBJ, PING.OBJ, CPU.OBJ, -
     MEMORY.OBJ, LOADAVG.OBJ, IF_THR.OBJ, OS.OBJ, -
-    SNG.OPT/OPTIONS
+    'OPTS'
 $! Linker reports undefined symbols as warnings and still writes the image
 $ IF .NOT. $STATUS THEN GOTO ERROR
 $!

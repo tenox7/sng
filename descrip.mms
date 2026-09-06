@@ -1,6 +1,7 @@
 # SNG description file for MMS/MMK on OpenVMS (DECwindows X11)
 # Datasources: clock, tcp, snmp, ping (raw ICMP - needs SYSPRV),
-# cpu ($GETJPI scan), memory (VAX scheduler cells via SYS.STB).
+# cpu ($GETJPI scan), memory (VAX: scheduler cells via SYS.STB,
+# Alpha/I64: $GETRMI).
 # Still stubbed: loadavg, if_thr. NO_SHELL: shell ds not portable to VMS.
 #
 #   $ MMK            (or MMS)
@@ -9,6 +10,11 @@
 CFLAGS = /DEFINE=(GFX_X11,NO_SHELL) /INCLUDE_DIRECTORY=[] -
          /NESTED_INCLUDE_DIRECTORY=INCLUDE_FILE -
          /NAMES=(UPPERCASE,SHORTENED)
+
+LINKOPTS = SNG.OPT/OPTIONS
+.IFDEF __VAX__
+LINKOPTS = SNG.OPT/OPTIONS, SNG_VAX.OPT/OPTIONS
+.ENDIF
 
 OBJS = MAIN.OBJ GRAPHICS.OBJ CONFIG.OBJ PLOT.OBJ RINGBUF.OBJ -
        THREADING.OBJ INI_PARSER.OBJ DATASOURCE.OBJ HTTPD.OBJ CLOCK.OBJ -
@@ -21,7 +27,7 @@ SNG.EXE : $(OBJS) SNG.OPT
 	    THREADING.OBJ, INI_PARSER.OBJ, DATASOURCE.OBJ, HTTPD.OBJ, CLOCK.OBJ, -
 	    TCP.OBJ, SNMP.OBJ, SNMP_CLIENT.OBJ, PING.OBJ, CPU.OBJ, -
 	    MEMORY.OBJ, LOADAVG.OBJ, IF_THR.OBJ, OS.OBJ, -
-	    SNG.OPT/OPTIONS
+	    $(LINKOPTS)
 
 .FIRST
 	IF F$TRNLNM("X11") .EQS. "" THEN DEFINE/NOLOG X11 DECW$INCLUDE

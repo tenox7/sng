@@ -212,15 +212,17 @@ run queue out of `/proc`.
 
 ### OpenVMS
 
-DECwindows X11, tested on VAX/VMS 7.3 with Compaq C V6.4:
+DECwindows X11, tested on VAX/VMS 7.3 with Compaq C V6.4 and on OpenVMS
+Alpha V8.4 with HP C V7.3:
 
 ```
 $ @VMSBUILD
 ```
 
 or `MMK` with the supplied `descrip.mms`. Notes: `ping=` uses a raw
-socket and needs SYSPRV; memory stats read VAX executive cells (image
-links against SYS$SYSTEM:SYS.STB); `shell=` and `loadavg=` are not
+socket and needs SYSPRV; memory stats come from `$GETRMI`, except on VAX
+where they read the executive cells (the image links against
+SYS$SYSTEM:SYS.STB, see `sng_vax.opt`); `shell=` and `loadavg=` are not
 available on VMS.
 
 ### Linux universal packages

@@ -16,3 +16,9 @@ packaging/snap/parts/
 packaging/snap/stage/
 packaging/snap/prime/
 packaging/snap/*.snap
+
+# OpenVMS build output
+*.obj;*
+sng.exe
+cxx_repository/
+.$ADF$*

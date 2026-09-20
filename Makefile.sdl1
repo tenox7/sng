@@ -1,0 +1,107 @@
+# SNG on SDL 1.2 - generic, any platform with an SDL 1.2 (or sdl12-compat)
+# development kit.  Flags come from sdl-config, so nothing here is tied to a
+# particular SDL install; override with SDLCONFIG=... if yours is named
+# differently (sdl11-config, sdl12-config, ...).
+CC = gcc
+SDLCONFIG = sdl-config
+CFLAGS = -g -DGFX_SDL1
+LDFLAGS = -lpthread -lm
+
+SOURCES = main.c graphics.c config.c plot.c ringbuf.c threading.c ini_parser.c datasource.c httpd.c ds/snmp_client.c ds/ping.c ds/tcp.c ds/cpu.c ds/memory.c ds/snmp.c ds/if_thr.c ds/loadavg.c ds/shell.c ds/clock.c os/os.c
+OBJECTS = $(SOURCES:.c=.o)
+TARGET = sng
+
+# Auto detect OS
+all:
+	@s=`uname -s`; r=`uname -r`; v=`uname -v`; m=`uname -m`; \
+	case "$$s" in \
+	  Linux)   t=linux;; \
+	  Darwin)  t=macos;; \
+	  FreeBSD|NetBSD|OpenBSD|DragonFly) t=bsd;; \
+	  SunOS)   t=solaris;; \
+	  AIX)     t=aix;; \
+	  OSF1)    t=osf1;; \
+	  HP-UX)   case "$$r" in \
+	             *.10.*) t=hpux10;; \
+	             *) t=hpux;; \
+	           esac;; \
+	  IRIX*)   t=irix;; \
+	  UnixWare|UNIX_SV) t=unixware;; \
+	  SCO_SV)  case "$$v" in 6.*) t=osr6;; *) echo "OpenServer $$v is not supported"; exit 1;; esac;; \
+	  MINGW*|MSYS*|CYGWIN*) echo "use Makefile.win32 on Windows"; exit 1;; \
+	  *) echo "$$s not known here, building with the defaults"; t=generic;; \
+	esac; \
+	echo "=> make $$t"; \
+	$(MAKE) -f Makefile.sdl1 $$t
+
+$(TARGET): $(OBJECTS)
+	$(CC) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# SysV make ignores the pattern rule above and its built-in .c.o drops the
+# object in the current directory, which breaks the ds/ and os/ subdirectories.
+.SUFFIXES: .c .o
+.c.o:
+	$(CC) $(CFLAGS) -c $< -o $@
+
+generic:
+	$(MAKE) -f Makefile.sdl1 CFLAGS="-g -DGFX_SDL1 `$(SDLCONFIG) --cflags`" \
+	  LDFLAGS="`$(SDLCONFIG) --libs` -lpthread -lm" $(TARGET)
+
+linux:
+	$(MAKE) -f Makefile.sdl1 CFLAGS="-g -DGFX_SDL1 -DLINUX `$(SDLCONFIG) --cflags`" \
+	  LDFLAGS="`$(SDLCONFIG) --libs` -lpthread -lm" $(TARGET)
+
+# sdl12-compat over SDL2; real SDL 1.2 works too on PowerPC/32-bit OS X.
+macos:
+	$(MAKE) -f Makefile.sdl1 CFLAGS="-g -DGFX_SDL1 `$(SDLCONFIG) --cflags`" \
+	  LDFLAGS="`$(SDLCONFIG) --libs`" $(TARGET)
+
+bsd:
+	$(MAKE) -f Makefile.sdl1 CFLAGS="-g -DGFX_SDL1 `$(SDLCONFIG) --cflags`" \
+	  LDFLAGS="`$(SDLCONFIG) --libs` -lpthread -lm" $(TARGET)
+
+solaris:
+	$(MAKE) -f Makefile.sdl1 CFLAGS="-g -DGFX_SDL1 `$(SDLCONFIG) --cflags`" \
+	  LDFLAGS="`$(SDLCONFIG) --libs` -lpthread -lm -lsocket -lnsl -lrt -lkstat -lresolv" $(TARGET)
+
+hpux:
+	$(MAKE) -f Makefile.sdl1 CFLAGS="-g -DGFX_SDL1 `$(SDLCONFIG) --cflags`" \
+	  LDFLAGS="`$(SDLCONFIG) --libs` -lpthread -lm -lnm" $(TARGET)
+
+# 10.20 has no pthreads and no NMAPI: gcc -threads gives DCE/CMA (-lcma -lc_r)
+hpux10:
+	$(MAKE) -f Makefile.sdl1 CFLAGS="-g -DGFX_SDL1 -DHPUX10 -threads -include os/hpux10.h `$(SDLCONFIG) --cflags`" \
+	  LDFLAGS="`$(SDLCONFIG) --libs` -lm -threads" $(TARGET)
+
+aix:
+	$(MAKE) -f Makefile.sdl1 CFLAGS="-g -DGFX_SDL1 -pthread `$(SDLCONFIG) --cflags`" \
+	  LDFLAGS="`$(SDLCONFIG) --libs` -pthread -lm" $(TARGET)
+
+unixware:
+	$(MAKE) -f Makefile.sdl1 CFLAGS="-g -DGFX_SDL1 -DUNIXWARE `$(SDLCONFIG) --cflags`" \
+	  LDFLAGS="`$(SDLCONFIG) --libs` -lthread -lm -lsocket -lnsl -lelf -lmas" $(TARGET)
+
+osr6:
+	$(MAKE) -f Makefile.sdl1 CC=cc \
+	  CFLAGS="-O -Kthread -DGFX_SDL1 -DOSR6 `$(SDLCONFIG) --cflags`" \
+	  LDFLAGS="-Kthread `$(SDLCONFIG) --libs` -lsocket -lnsl -lmas -lelf -lm" $(TARGET)
+
+# -std is DEC C's relaxed ANSI mode; vm_statistics() lives in libmach.
+osf1:
+	$(MAKE) -f Makefile.sdl1 CC=cc CFLAGS="-std -O2 -DGFX_SDL1 -pthread `$(SDLCONFIG) --cflags`" \
+	  LDFLAGS="`$(SDLCONFIG) --libs` -pthread -lm -lmach" $(TARGET)
+
+irix:
+	$(MAKE) -f Makefile.sdl1 CFLAGS="-g -DGFX_SDL1 -isystem /usr/include -D__STDINT_H__ `$(SDLCONFIG) --cflags`" \
+	  LDFLAGS="`$(SDLCONFIG) --libs` -lpthread -lelf" $(TARGET)
+
+clean:
+	rm -f *.o */*.o $(TARGET)
+
+install: $(TARGET)
+	cp $(TARGET) /usr/local/bin/
+
+.PHONY: all clean install generic linux macos bsd solaris hpux hpux10 aix unixware osr6 osf1 irix

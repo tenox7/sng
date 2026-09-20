@@ -32,7 +32,7 @@ Supports multiple graphs with:
 
 - X11
 - GTK 2/3
-- SDL 2/3
+- SDL 1.2/2/3
 - GLFW
 - COCOA
 - GDI
@@ -188,6 +188,19 @@ make -f Makefile.x11
 Named targets still work if the guess is wrong: `linux`, `solaris`, `hpux`,
 `hpux10`, `aix`, `unixware`, `osr6`, `osf1`, `irix`, `irix5`.
 
+### SDL 1.2
+
+Generic `uname` + `sdl-config` makefile, works anywhere SDL 1.2 or
+sdl12-compat exists, macOS included. Override the guess with a named target
+(`linux`, `macos`, `bsd`, `solaris`, `hpux`, `aix`, `irix`, ...) or
+`SDLCONFIG=sdl12-config`.
+
+```
+make -f Makefile.sdl1
+```
+
+Uses the built-in 6x9 font, so `font_size` only scales it; no always-on-top.
+
 ### macOS / Darwin
 
 ```
@@ -252,6 +265,13 @@ Output goes to `dist/`. Flatpak and Snap builds compile with `NO_SHELL=1` becaus
 AppImage runs unsandboxed so `shell=` is kept.
 
 ## Development libraries
+
+### SDL 1.2
+
+```
+apt install libsdl1.2-dev          # or libsdl1.2-compat-dev
+brew install sdl12-compat          # macOS
+```
 
 ### SDL2
 

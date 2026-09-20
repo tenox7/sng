@@ -10,8 +10,9 @@ Supports multiple graphs with:
 - Some local stats like CPU, Mem, Load Avg
 - Shell commands
 
-![SNG Screenshot](sng1.png)
-![SNG Screenshot](sng2.png)
+![SNG Modern Theme](sng3.png)
+![SNG Legacy Theme](sng1.png)
+![SNG Legacy Theme](sng2.png)
 
 ## Supported OS
 

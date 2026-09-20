@@ -11,6 +11,8 @@ Supports multiple graphs with:
 - Shell commands
 
 ![SNG Modern Theme](sng3.png)
+
+
 ![SNG Legacy Theme](sng1.png)
 ![SNG Legacy Theme](sng2.png)
 

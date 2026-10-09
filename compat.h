@@ -104,6 +104,9 @@
 #elif defined(sgi)
   #include <sys/types.h>
   #include <inttypes.h>
+#elif defined(__sinix__)
+  #include <sys/types.h>
+  #include <inttypes.h>
 #else
   #include <stdint.h>
 #endif

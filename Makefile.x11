@@ -22,6 +22,7 @@ all:
 	  IRIX*)   case "$$r" in 5.*) t=irix5;; *) t=irix;; esac;; \
 	  UnixWare|UNIX_SV) t=unixware;; \
 	  SCO_SV)  case "$$v" in 6.*) t=osr6;; *) echo "OpenServer $$v is not supported"; exit 1;; esac;; \
+	  ReliantUNIX*) t=reliant;; \
 	  Darwin)  echo "use Makefile.macos on macOS"; exit 1;; \
 	  *) echo "$$s not known here, building with the defaults"; t=$(TARGET);; \
 	esac; \
@@ -71,6 +72,16 @@ osr6:
 	  CFLAGS="-O -Kthread -DGFX_X11 -DOSR6" \
 	  LDFLAGS="-Kthread -L/usr/X11R6/lib -lX11 -lsocket -lnsl -lmas -lelf -lm" $(TARGET)
 
+# Reliant UNIX 5.45: UNIX98 threads from /opt/pthread run on the threaded libc,
+# which has to be the program interpreter. ld marks every gcc-linked program as
+# DCE threads and the loader then refuses libpthread, so the UNIX98 flag (0x50
+# in the third e_flags byte) is set after linking.
+reliant:
+	$(MAKE) -f Makefile.x11 CFLAGS="-O2 -DGFX_X11 -D_LONGLONG -D_REENTRANT -D_UNIX98_THREADS" \
+	  LDFLAGS="-L/opt/pthread/lib -lX11 -lsocket -lnsl -lext -lpthread -lmproc -lm \
+	    -Wl,-I,/opt/thread/lib/libc_r.so.1" $(TARGET)
+	printf '\120' | dd of=$(TARGET) bs=1 seek=38 conv=notrunc 2>/dev/null
+
 # Compaq C defaults to K&R mode on V4.0, where a # that is not in column 1 is
 # ignored, which drops the indented directives in compat.h.  -std is DEC C's
 # relaxed ANSI mode.  vm_statistics() lives in libmach, not libc.
@@ -98,4 +109,4 @@ clean:
 install: $(TARGET)
 	cp $(TARGET) /usr/local/bin/
 
-.PHONY: all clean install linux solaris hpux hpux1131ia64 hpux10 aix unixware osr6 osf1 irix irix5
+.PHONY: all clean install linux solaris hpux hpux1131ia64 hpux10 aix unixware osr6 reliant osf1 irix irix5

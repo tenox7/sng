@@ -33,6 +33,8 @@ typedef SOCKET sock_t;
 typedef unsigned int socklen_t;
 #elif (defined(_AIX) && !defined(_AIX43)) || defined(__osf__) || defined(__digital__) || (defined(__hpux) && !defined(_SOCKLEN_T)) || defined(IRIX5)
 typedef int socklen_t;
+#elif defined(__sinix__) && !defined(_SOCKLEN_T)
+typedef size_t socklen_t;
 #endif
 typedef int sock_t;
 #define INVALID_SOCKET (-1)

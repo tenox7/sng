@@ -22,6 +22,8 @@
     #include "irix65.c"
 #elif defined(__osf__) || defined(__OSF1__)
     #include "decosf1.c"
+#elif defined(__sinix__)
+    #include "reliant.c"
 #else
     #include "unix.c"
 #endif

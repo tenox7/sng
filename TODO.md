@@ -24,6 +24,7 @@
 
 ## Platforms
 
+- Legacy OSX
 - OpenServer/OpenDesktop
 - NextStep/OpenStep
 - Plan9

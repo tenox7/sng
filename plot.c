@@ -602,6 +602,10 @@ plot_system_t *plot_system_create(config_t *config) {
         window_set_topmost(system->window, 1);
     }
 
+    if (config->all_desktops) {
+        window_set_all_desktops(system->window, 1);
+    }
+
     system->renderer = renderer_create(system->window);
     if (!system->renderer) {
         window_destroy(system->window);

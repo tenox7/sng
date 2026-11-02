@@ -232,6 +232,12 @@ void window_set_topmost(window_t *window, int topmost) {
                  0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 }
 
+/* Windows has no public API to put a window on all virtual desktops. */
+void window_set_all_desktops(window_t *window, int all_desktops) {
+    (void)window;
+    (void)all_desktops;
+}
+
 void window_get_size(window_t *window, int32_t *width, int32_t *height) {
     win32_window_t *win;
     RECT rect;

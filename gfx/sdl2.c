@@ -97,6 +97,12 @@ void window_set_topmost(window_t *window, int topmost) {
     }
 }
 
+/* SDL2 cannot put a window on all desktops. */
+void window_set_all_desktops(window_t *window, int all_desktops) {
+    (void)window;
+    (void)all_desktops;
+}
+
 void window_get_size(window_t *window, int32_t *width, int32_t *height) {
     if (!window || !width || !height) return;
     SDL_GetWindowSize((SDL_Window*)window->handle, width, height);

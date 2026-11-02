@@ -20,6 +20,9 @@ static const char *DEFAULT_CONFIG_HEAD =
 "window_margin=5\n"
 "max_fps=2\n"
 "fullscreen=false\n"
+#if defined(GFX_COCOA) || defined(GFX_GTK2) || defined(GFX_GTK3) || defined(GFX_X11)
+"all_desktops=false\n"
+#endif
 "fps_counter=false\n"
 "font_size=1.0\n"
 "#http_server=true\n"

@@ -275,6 +275,22 @@ void window_set_topmost(window_t *window, int topmost) {
     [cw->nswindow setLevel:(topmost ? NSStatusWindowLevel : NSNormalWindowLevel)];
 }
 
+/* Show the window on every Space (virtual desktop), like the Dock's
+ * Options > Assign To > All Desktops. */
+void window_set_all_desktops(window_t *window, int all_desktops) {
+    cocoa_window_t *cw;
+    NSWindowCollectionBehavior behavior;
+    if (!window) return;
+    cw = (cocoa_window_t *)window->handle;
+    behavior = [cw->nswindow collectionBehavior];
+    if (all_desktops) {
+        behavior |= NSWindowCollectionBehaviorCanJoinAllSpaces;
+    } else {
+        behavior &= ~NSWindowCollectionBehaviorCanJoinAllSpaces;
+    }
+    [cw->nswindow setCollectionBehavior:behavior];
+}
+
 void window_get_size(window_t *window, int32_t *width, int32_t *height) {
     cocoa_window_t *cw;
     NSRect b;

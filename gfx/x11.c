@@ -361,6 +361,57 @@ void window_set_topmost(window_t *window, int topmost) {
     XFlush(ctx->display);
 }
 
+static void send_wm_message(x11_window_context_t *ctx, Atom type,
+                            long l0, long l1, long l2, long l3) {
+    XEvent event;
+
+    memset(&event, 0, sizeof(event));
+    event.type = ClientMessage;
+    event.xclient.window = ctx->window;
+    event.xclient.message_type = type;
+    event.xclient.format = 32;
+    event.xclient.data.l[0] = l0;
+    event.xclient.data.l[1] = l1;
+    event.xclient.data.l[2] = l2;
+    event.xclient.data.l[3] = l3;
+    XSendEvent(ctx->display, DefaultRootWindow(ctx->display), False,
+               SubstructureNotifyMask | SubstructureRedirectMask, &event);
+}
+
+/* EWMH window managers get _NET_WM_DESKTOP 0xFFFFFFFF (all desktops) plus
+ * the sticky state. CDE dtwm gets the _DT_WORKSPACE_HINTS that
+ * DtWsmOccupyAllWorkspaces() writes: version 1, flags WSFLAGS,
+ * wsflags OCCUPY_ALL, no workspace list. Other window managers ignore
+ * all of it. sng only ever turns this on, so there is no off path. */
+void window_set_all_desktops(window_t *window, int all_desktops) {
+    x11_window_context_t *ctx;
+    Atom net_wm_desktop;
+    Atom dt_hints;
+    unsigned long all;
+    unsigned long hints[4];
+
+    if (!window || !all_desktops) return;
+
+    ctx = (x11_window_context_t*)window->handle;
+    all = 0xFFFFFFFFUL;
+    net_wm_desktop = XInternAtom(ctx->display, "_NET_WM_DESKTOP", False);
+    XChangeProperty(ctx->display, ctx->window, net_wm_desktop, XA_CARDINAL, 32,
+                    PropModeReplace, (unsigned char *)&all, 1);
+    send_wm_message(ctx, net_wm_desktop, (long)all, 1, 0, 0);
+    send_wm_message(ctx, XInternAtom(ctx->display, "_NET_WM_STATE", False), 1,
+                    (long)XInternAtom(ctx->display, "_NET_WM_STATE_STICKY", False),
+                    0, 1);
+
+    hints[0] = 1;
+    hints[1] = 1;
+    hints[2] = 1;
+    hints[3] = 0;
+    dt_hints = XInternAtom(ctx->display, "_DT_WORKSPACE_HINTS", False);
+    XChangeProperty(ctx->display, ctx->window, dt_hints, dt_hints, 32,
+                    PropModeReplace, (unsigned char *)hints, 4);
+    XFlush(ctx->display);
+}
+
 void window_get_size(window_t *window, int32_t *width, int32_t *height) {
     x11_window_context_t *ctx;
     Window root;

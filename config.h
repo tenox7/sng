@@ -37,6 +37,7 @@ typedef struct {
     int32_t window_margin;
     int32_t max_fps;
     fullscreen_mode_t fullscreen;
+    int all_desktops;
     int fps_counter;
     int retro;
     float font_size;

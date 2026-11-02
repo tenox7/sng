@@ -31,6 +31,7 @@ void window_destroy(window_t *window);
 void window_set_fullscreen(window_t *window, int fullscreen);
 int window_is_fullscreen(window_t *window);
 void window_set_topmost(window_t *window, int topmost);
+void window_set_all_desktops(window_t *window, int all_desktops);
 void window_get_size(window_t *window, int32_t *width, int32_t *height);
 int window_was_resized(void);
 

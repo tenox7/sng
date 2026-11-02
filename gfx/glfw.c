@@ -176,6 +176,12 @@ void window_set_topmost(window_t *window, int topmost) {
     glfwSetWindowAttrib(glfw_window, GLFW_FLOATING, topmost ? GLFW_TRUE : GLFW_FALSE);
 }
 
+/* GLFW cannot put a window on all desktops. */
+void window_set_all_desktops(window_t *window, int all_desktops) {
+    (void)window;
+    (void)all_desktops;
+}
+
 void window_get_size(window_t *window, int32_t *width, int32_t *height) {
     if (!window || !width || !height) return;
     glfwGetWindowSize((GLFWwindow*)window->handle, width, height);

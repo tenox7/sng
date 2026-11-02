@@ -320,6 +320,7 @@ config_t *config_load(const char *filename) {
     config->window_margin = 5;
     config->max_fps = 30;
     config->fullscreen = FULLSCREEN_OFF;
+    config->all_desktops = 0;
     config->fps_counter = 0;
     config->font_size = 1.0f;
     config->font_name = NULL;
@@ -380,6 +381,9 @@ config_t *config_load(const char *filename) {
         } else {
             config->fullscreen = FULLSCREEN_OFF;
         }
+    }
+    if ((value = ini_get_value(ini, "global", "all_desktops"))) {
+        config->all_desktops = (strcmp(value, "1") == 0 || strcmp(value, "true") == 0);
     }
     if ((value = ini_get_value(ini, "global", "http_server"))) {
         config->http_enabled = (strcmp(value, "1") == 0 || strcmp(value, "true") == 0);

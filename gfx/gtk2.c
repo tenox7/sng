@@ -226,6 +226,20 @@ void window_set_topmost(window_t *window, int topmost) {
     gtk_window_set_keep_above(GTK_WINDOW(ctx->window), topmost);
 }
 
+/* GTK sends the EWMH sticky / all desktops requests itself. */
+void window_set_all_desktops(window_t *window, int all_desktops) {
+    gtk_window_context_t *ctx;
+
+    if (!window) return;
+
+    ctx = (gtk_window_context_t*)window->handle;
+    if (all_desktops) {
+        gtk_window_stick(GTK_WINDOW(ctx->window));
+    } else {
+        gtk_window_unstick(GTK_WINDOW(ctx->window));
+    }
+}
+
 void window_get_size(window_t *window, int32_t *width, int32_t *height) {
     gtk_window_context_t *ctx;
 

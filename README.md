@@ -104,6 +104,7 @@ You can also specify the location with `-f /full/path/to/sng.ini`
 - `window_margin` - pixels
 - `max_fps` - frames per second
 - `fullscreen` - `0`, `1`, `force`
+- `all_desktops` - `true`, `false` - show the window on every virtual desktop / workspace. Cocoa (macOS Spaces), GTK and X11 (EWMH window managers and CDE dtwm) backends
 - `fps_counter` - `0`, `1`
 - `font_size` - float or font name
 - `font_name` - font family name

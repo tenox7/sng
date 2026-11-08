@@ -135,6 +135,9 @@ int main(int argc, char *argv[]) {
     graphics_start_render_timer(config->max_fps);
 
     while (running) {
+#ifdef SNG_NO_THREADS
+        data_collector_poll(data_collector);
+#endif
         if (!plot_system_update(plot_system)) {
             exit(0);
         }

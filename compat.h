@@ -98,6 +98,26 @@
 #elif defined(__sun) || defined(__sun__) || defined(sun)
   #include <sys/types.h>
   #include <inttypes.h>
+#elif defined(HPUX9)
+  /* HP-UX 9 has no inttypes.h */
+  #include <sys/types.h>
+  typedef unsigned char uint8_t;
+  typedef unsigned short uint16_t;
+  typedef unsigned int uint32_t;
+  typedef unsigned long long uint64_t;
+  typedef signed char int8_t;
+  typedef short int16_t;
+  typedef int int32_t;
+  typedef long long int64_t;
+  #ifndef INT32_MAX
+    #define INT32_MAX 2147483647
+  #endif
+  #ifndef INT32_MIN
+    #define INT32_MIN (-2147483647-1)
+  #endif
+  #ifndef INET_ADDRSTRLEN
+    #define INET_ADDRSTRLEN 16
+  #endif
 #elif defined(__hpux)
   #include <sys/types.h>
   #include <inttypes.h>

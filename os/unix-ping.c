@@ -35,7 +35,7 @@ typedef int socklen_t;
 #elif defined(__sinix__) && !defined(_SOCKLEN_T)
 typedef size_t socklen_t;
 #endif
-#ifdef IRIX5
+#if defined(IRIX5) || defined(HPUX9)
 typedef unsigned int in_addr_t;
 #endif
 

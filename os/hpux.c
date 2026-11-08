@@ -22,7 +22,9 @@ struct plot_thread_t {
 #else
 #include <sys/mib.h>
 #include <netinet/mib_kern.h>
+#ifndef SNG_NO_THREADS
 #include <pthread.h>
+#endif
 #endif
 
 const char* os_get_platform_name(void) {
@@ -149,8 +151,14 @@ int os_memory_get_stats_dual(double *used_value, double *swap_value) {
 #ifdef SW_PSEUDO
         if (swi.pss_flags & SW_PSEUDO) continue;
 #endif
+#ifdef HPUX9
+        /* 9.x: size in KB blocks, free space in pages */
+        swap_total += (uint64_t)swi.pss_un.Pss_blk.Pss_nblks;
+        swap_free += (uint64_t)swi.pss_nfpgs * (NBPG / 1024);
+#else
         swap_total += (uint64_t)swi.pss_nblksenabled;
         swap_free += (uint64_t)swi.pss_nblksavail;
+#endif
     }
 
     if (swap_total == 0 || swap_free > swap_total) {
@@ -181,7 +189,21 @@ int os_loadavg_get_stats(double *value) {
     return 1;
 }
 
-#ifdef HPUX10
+#ifdef HPUX9
+
+/* 9.x has neither the NMAPI nor lanadmin, and netstat -i counts packets
+ * only: no byte counters to read. */
+int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint32_t* out_bytes) {
+    (void)interface_name;
+    (void)in_bytes;
+    (void)out_bytes;
+    return 0;
+}
+
+#endif
+
+#if defined(HPUX10) || defined(HPUX9)
+#ifndef HPUX9
 
 /* 10.20 predates the NMAPI and its struct ifnet has no byte counters, so
  * lanadmin's menu is the only source of octet counts. It costs a fork per
@@ -225,6 +247,8 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
 
     return matched && got == 3;
 }
+
+#endif /* !HPUX9 */
 
 int os_get_default_gw_ip(char *buf, size_t buflen) {
     char line[256], dest[64], gw[64];
@@ -322,6 +346,24 @@ int os_get_interface_stats(const char* interface_name, uint32_t* in_bytes, uint3
 
 #endif /* HPUX10 */
 
+#ifdef HPUX9
+/* 9.x has neither usleep nor nanosleep */
+int usleep(unsigned int usec) {
+    struct timeval tv;
+
+    tv.tv_sec = usec / 1000000;
+    tv.tv_usec = usec % 1000000;
+    return select(0, NULL, NULL, NULL, &tv);
+}
+
+void os_sleep(uint32_t milliseconds) {
+    struct timeval tv;
+
+    tv.tv_sec = milliseconds / 1000;
+    tv.tv_usec = (milliseconds % 1000) * 1000;
+    select(0, NULL, NULL, NULL, &tv);
+}
+#else
 void os_sleep(uint32_t milliseconds) {
     struct timespec ts;
 
@@ -329,6 +371,7 @@ void os_sleep(uint32_t milliseconds) {
     ts.tv_nsec = (milliseconds % 1000) * 1000000;
     nanosleep(&ts, NULL);
 }
+#endif
 
 uint32_t os_get_time_ms(void) {
     struct timeval tv;
@@ -337,6 +380,7 @@ uint32_t os_get_time_ms(void) {
     return (uint32_t)(tv.tv_sec * 1000 + tv.tv_usec / 1000);
 }
 
+#ifndef SNG_NO_THREADS
 plot_mutex_t *os_plot_mutex_create(void) {
     plot_mutex_t *mutex;
     int ret;
@@ -433,11 +477,13 @@ int os_plot_thread_join_timeout(plot_thread_t *thread, uint32_t timeout_ms) {
     return (result == 0);
 }
 
+#endif /* !SNG_NO_THREADS */
+
 char *os_get_config_path(const char *filename) {
     return (char *)filename;
 }
 
-#ifndef HPUX10
+#if !defined(HPUX10) && !defined(HPUX9)
 
 int os_get_default_gw_ip(char *buf, size_t buflen) {
     int fd, count, i;
@@ -489,7 +535,9 @@ int os_get_default_gw_ip(char *buf, size_t buflen) {
 #endif /* !HPUX10 */
 
 #include "unix-ping.c"
-#ifdef HPUX10
+#if defined(SNG_NO_THREADS)
+#include "nothreads.c"
+#elif defined(HPUX10)
 #include "cma_timer.c"
 #else
 #include "posix_timer.c"

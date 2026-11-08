@@ -15,6 +15,7 @@ all:
 	  AIX)     t=aix;; \
 	  OSF1)    t=osf1;; \
 	  HP-UX)   case "$$r" in \
+	             *.09.*) t=hpux9;; \
 	             *.10.*) t=hpux10;; \
 	             *.11.31*) case "$$m" in ia64) t=hpux1131ia64;; *) t=hpux;; esac;; \
 	             *) t=hpux;; \
@@ -55,6 +56,10 @@ hpux1131ia64:
 	  CFLAGS="-AC99 +O3 +DSitanium2 -mt -DGFX_X11 \
 	    -D_XOPEN_SOURCE_EXTENDED -D_HPUX_SOURCE" \
 	  LDFLAGS="-mt -L/usr/lib/hpux32 -lX11 -lpthread -lm -lnm" $(TARGET)
+
+# 9.x has no thread library at all: sources are sampled from the main loop
+hpux9:
+	$(MAKE) -f Makefile.x11 CFLAGS="-O -DGFX_X11 -DHPUX9 -DSNG_NO_THREADS -I/usr/include/X11R5" LDFLAGS="-L/usr/lib/X11R5 -lX11 -lm" $(TARGET)
 
 # 10.20 has no pthreads and no NMAPI: gcc -threads gives DCE/CMA (-lcma -lc_r)
 hpux10:

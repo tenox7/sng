@@ -16,6 +16,9 @@ typedef struct {
     plot_thread_t *thread;
     int32_t refresh_interval_ms;
     int is_dual;
+#ifdef SNG_NO_THREADS
+    uint32_t next_due_ms;
+#endif
 } data_source_t;
 
 typedef struct {
@@ -26,5 +29,8 @@ typedef struct {
 data_collector_t *data_collector_create(config_t *config);
 void data_collector_destroy(data_collector_t *collector);
 int data_collector_start(data_collector_t *collector);
+#ifdef SNG_NO_THREADS
+void data_collector_poll(data_collector_t *collector);
+#endif
 
 #endif

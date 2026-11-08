@@ -4,13 +4,41 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void data_source_thread(void *arg) {
-    data_source_t *source;
-    uint32_t sample_count;
+/* Take one sample from a source and push it into its ring buffer(s). */
+static void data_source_sample(data_source_t *source) {
     double in_value, out_value;
-    int success;
     double value;
     uint32_t now_ms;
+    int success;
+
+    if (!source->datasource) {
+        ringbuf_push(source->data_buffer, -1.0, os_get_time_ms());
+        return;
+    }
+
+    if (source->is_dual && source->datasource->handler->collect_dual) {
+        in_value = 0.0;
+        out_value = 0.0;
+        success = source->datasource->handler->collect_dual(source->datasource->context, &in_value, &out_value);
+        now_ms = os_get_time_ms();
+        if (success) {
+            ringbuf_push(source->data_buffer, in_value, now_ms);
+            ringbuf_push(source->data_buffer_secondary, out_value, now_ms);
+        } else {
+            ringbuf_push(source->data_buffer, -1.0, now_ms);
+            ringbuf_push(source->data_buffer_secondary, -1.0, now_ms);
+        }
+    } else {
+        value = 0.0;
+        success = datasource_collect(source->datasource, &value);
+        now_ms = os_get_time_ms();
+        ringbuf_push(source->data_buffer, success ? value : -1.0, now_ms);
+    }
+}
+
+#ifndef SNG_NO_THREADS
+static void data_source_thread(void *arg) {
+    data_source_t *source;
     plot_timer_t *timer;
 
     source = (data_source_t*)arg;
@@ -19,49 +47,12 @@ static void data_source_thread(void *arg) {
     timer = os_plot_timer_create((uint32_t)source->refresh_interval_ms);
     if (!timer) return;
 
-    if (!source->datasource) {
-        while (1) {
-            ringbuf_push(source->data_buffer, -1.0, os_get_time_ms());
-            os_plot_timer_wait(timer);
-        }
-    }
-
-    sample_count = 0;
     while (1) {
-
-        if (source->is_dual && source->datasource->handler->collect_dual) {
-            in_value = 0.0;
-            out_value = 0.0;
-            success = source->datasource->handler->collect_dual(source->datasource->context, &in_value, &out_value);
-            now_ms = os_get_time_ms();
-
-            if (success) {
-                ringbuf_push(source->data_buffer, in_value, now_ms);
-                ringbuf_push(source->data_buffer_secondary, out_value, now_ms);
-            } else {
-                ringbuf_push(source->data_buffer, -1.0, now_ms);
-                ringbuf_push(source->data_buffer_secondary, -1.0, now_ms);
-            }
-
-            sample_count++;
-        } else {
-            value = 0.0;
-            success = datasource_collect(source->datasource, &value);
-            now_ms = os_get_time_ms();
-
-            if (success) {
-                ringbuf_push(source->data_buffer, value, now_ms);
-            } else {
-                ringbuf_push(source->data_buffer, -1.0, now_ms);
-            }
-
-            sample_count++;
-        }
-
+        data_source_sample(source);
         os_plot_timer_wait(timer);
     }
-
 }
+#endif
 
 data_collector_t *data_collector_create(config_t *config) {
     data_collector_t *collector;
@@ -164,6 +155,39 @@ void data_collector_destroy(data_collector_t *collector) {
     free(collector);
 }
 
+#ifdef SNG_NO_THREADS
+/* No threads (HP-UX 9): the main loop calls data_collector_poll() and each
+ * source is sampled there when its interval is due. A slow source (ping,
+ * snmp, shell) holds up the display while it runs. */
+int data_collector_start(data_collector_t *collector) {
+    uint32_t i, now;
+
+    if (!collector) return 0;
+    now = os_get_time_ms();
+    for (i = 0; i < collector->source_count; i++) {
+        collector->sources[i].thread = NULL;
+        collector->sources[i].next_due_ms = now;
+    }
+    return 1;
+}
+
+void data_collector_poll(data_collector_t *collector) {
+    uint32_t i, now;
+    data_source_t *source;
+
+    if (!collector) return;
+    for (i = 0; i < collector->source_count; i++) {
+        source = &collector->sources[i];
+        now = os_get_time_ms();
+        if ((int32_t)(now - source->next_due_ms) < 0) continue;
+        data_source_sample(source);
+        source->next_due_ms += (uint32_t)source->refresh_interval_ms;
+        now = os_get_time_ms();
+        if ((int32_t)(now - source->next_due_ms) > source->refresh_interval_ms)
+            source->next_due_ms = now;
+    }
+}
+#else
 int data_collector_start(data_collector_t *collector) {
     uint32_t i;
     data_source_t *source;
@@ -181,4 +205,4 @@ int data_collector_start(data_collector_t *collector) {
 
     return 1;
 }
-
+#endif

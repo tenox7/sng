@@ -95,6 +95,47 @@
   #ifndef INT32_MIN
     #define INT32_MIN INT_MIN
   #endif
+#elif defined(SOLARIS251)
+  /* Solaris 2.5.1 has no inttypes.h (2.6 added it), no socklen_t, in_addr_t
+   * or INET_ADDRSTRLEN. <pthread.h>, <semaphore.h> and <sys/synch.h> define
+   * uint8_t, uint32_t and uint64_t under these guards, so match them.
+   * libc has snprintf and vsnprintf only under the private names __snprintf
+   * and __vsnprintf (2.6 made them public). */
+  #include <sys/types.h>
+  #include <stdio.h>
+  #include <stdarg.h>
+  #ifndef _UINT8_T
+  #define _UINT8_T
+  typedef unsigned char uint8_t;
+  #endif
+  #ifndef _UINT32_T
+  #define _UINT32_T
+  typedef unsigned long uint32_t;
+  #endif
+  #ifndef _UINT64_T
+  #define _UINT64_T
+  typedef u_longlong_t uint64_t;
+  #endif
+  typedef unsigned short uint16_t;
+  typedef signed char int8_t;
+  typedef short int16_t;
+  typedef int int32_t;
+  typedef long long int64_t;
+  typedef int socklen_t;
+  typedef unsigned long in_addr_t;
+  extern int __snprintf(char *, size_t, const char *, ...);
+  extern int __vsnprintf(char *, size_t, const char *, va_list);
+  #define snprintf __snprintf
+  #define vsnprintf __vsnprintf
+  #ifndef INT32_MAX
+    #define INT32_MAX 2147483647
+  #endif
+  #ifndef INT32_MIN
+    #define INT32_MIN (-2147483647-1)
+  #endif
+  #ifndef INET_ADDRSTRLEN
+    #define INET_ADDRSTRLEN 16
+  #endif
 #elif defined(__sun) || defined(__sun__) || defined(sun)
   #include <sys/types.h>
   #include <inttypes.h>

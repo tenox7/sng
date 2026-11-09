@@ -25,7 +25,20 @@ struct plot_thread_t {
 #include <inet/mib2.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#ifndef SOLARIS251
 #include <inet/ip.h>
+#else
+/* Solaris 2.5.1: <inet/ip.h> needs the kernel types of <inet/common.h> and has
+ * no IRE_DEFAULT. struct opthdr is only in <sys/socket.h> and T_SUCCESS only in
+ * <sys/tiuser.h>. The route table is MIB2_IP_21, a default route has ire type
+ * 0x2, and the IP module answers a MIB "get" with MGMT_flags 0x100 (XTI's
+ * T_CURRENT, 0x080, gets a T_ERROR_ACK). */
+#include <sys/socket.h>
+#include <sys/tiuser.h>
+#define MI_T_CURRENT 0x100
+#define MIB2_IP_ROUTE MIB2_IP_21
+#define IRE_DEFAULT 0x0002
+#endif
 
 const char* os_get_platform_name(void) {
     return "sunos";

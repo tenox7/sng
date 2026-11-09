@@ -11,7 +11,7 @@ all:
 	@s=`uname -s`; r=`uname -r`; v=`uname -v`; m=`uname -m`; \
 	case "$$s" in \
 	  Linux)   t=linux;; \
-	  SunOS)   t=solaris;; \
+	  SunOS)   case "$$r" in 5.5.1) t=solaris251;; *) t=solaris;; esac;; \
 	  AIX)     t=aix;; \
 	  OSF1)    t=osf1;; \
 	  HP-UX)   case "$$r" in \
@@ -47,6 +47,12 @@ linux:
 
 solaris:
 	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11" LDFLAGS="-lX11 -lpthread -lm -lsocket -lnsl -lrt -lkstat -lresolv" $(TARGET)
+
+# Solaris 2.5.1: no librt (POSIX.1b is libposix4) and X11 lives in /usr/openwin.
+# compat.h supplies the C99 types, socklen_t and the snprintf prototypes.
+solaris251:
+	$(MAKE) -f Makefile.x11 CFLAGS="-O -DGFX_X11 -DSOLARIS251 -I/usr/openwin/include" \
+	  LDFLAGS="-L/usr/openwin/lib -R/usr/openwin/lib -lX11 -lpthread -lm -lsocket -lnsl -lposix4 -lkstat -lresolv" $(TARGET)
 
 hpux:
 	$(MAKE) -f Makefile.x11 CFLAGS="-g -DGFX_X11" LDFLAGS="-L/usr/lib/X11R6 -lX11 -lpthread -lm -lnm" $(TARGET)
@@ -114,4 +120,4 @@ clean:
 install: $(TARGET)
 	cp $(TARGET) /usr/local/bin/
 
-.PHONY: all clean install linux solaris hpux hpux1131ia64 hpux10 aix unixware osr6 reliant osf1 irix irix5
+.PHONY: all clean install linux solaris solaris251 hpux hpux1131ia64 hpux10 aix unixware osr6 reliant osf1 irix irix5

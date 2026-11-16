@@ -76,6 +76,87 @@ static void format_value(plot_t *plot, double value, char *buf, size_t size) {
     snprintf(buf, size, "%.1f%s", value, unit);
 }
 
+/* "dn" and "up" are drawn as arrows rather than printed: the core X fonts,
+ * GDI and the built-in 6x9 font have nothing past ASCII. */
+static int is_arrow_label(const char *label) {
+    return strcmp(label, "dn") == 0 || strcmp(label, "up") == 0;
+}
+
+/* Odd, so the point of the arrow sits on a pixel column. */
+static int32_t arrow_width(int32_t line_h) {
+    int32_t w;
+
+    w = (line_h - 4) * 3 / 4;
+    if (w < 5) w = 5;
+    return w | 1;
+}
+
+/* A digit-high arrow out of filled rects, which every backend draws crisp. */
+static void draw_arrow(renderer_t *renderer, int32_t x, int32_t y, int32_t line_h, int up) {
+    int32_t w, h, head, i;
+    rect_t r;
+
+    w = arrow_width(line_h);
+    head = w / 2 + 1;
+    h = line_h - 4;
+    if (h < head + 2) h = head + 2;
+    y += 2;
+
+    /* the head a row at a time, widest where it meets the shaft */
+    r.h = 1;
+    for (i = 0; i < head; i++) {
+        r.x = x + w / 2 - i;
+        r.w = 2 * i + 1;
+        r.y = up ? y + i : y + h - 1 - i;
+        renderer_fill_rect(renderer, r);
+    }
+
+    r.w = 1 + 2 * (w / 12);
+    r.x = x + (w - r.w) / 2;
+    r.h = h - head;
+    r.y = up ? y + head : y;
+    renderer_fill_rect(renderer, r);
+}
+
+/* One series of a dual plot: its label, then its value.  Only measures when
+ * renderer is NULL.  Returns the width. */
+static int32_t series_reading(renderer_t *renderer, font_t *font, color_t color,
+                              int32_t x, int32_t y, int32_t line_h,
+                              const char *label, const char *value) {
+    char buf[96];
+    int32_t w, h, aw;
+
+    if (is_arrow_label(label)) {
+        aw = arrow_width(line_h) + 4;
+        font_get_text_size(font, value, &w, &h);
+        if (renderer) {
+            renderer_set_color(renderer, color);
+            draw_arrow(renderer, x, y, line_h, label[0] == 'u');
+            font_draw_text(renderer, font, color, x + aw, y, value);
+        }
+        return aw + w;
+    }
+
+    snprintf(buf, sizeof(buf), "%s %s", label, value);
+    font_get_text_size(font, buf, &w, &h);
+    if (renderer)
+        font_draw_text(renderer, font, color, x, y, buf);
+    return w;
+}
+
+/* Both readings of a dual plot behind their labels, "rtt 0.8ms  jit 0.2ms",
+ * each in the color of its trace, so which is which needs no key elsewhere. */
+static int32_t dual_reading(renderer_t *renderer, font_t *font, int32_t x, int32_t y,
+                            int32_t line_h, const datasource_handler_t *handler,
+                            const char *value, const char *value_secondary,
+                            color_t color, color_t color_secondary) {
+    int32_t w;
+
+    w = series_reading(renderer, font, color, x, y, line_h, handler->label, value) + 8;
+    return w + series_reading(renderer, font, color_secondary, x + w, y, line_h,
+                              handler->label_secondary, value_secondary);
+}
+
 static void calculate_stats(plot_t *plot, data_source_t *data_source, uint32_t plot_index) {
     if (!plot) return;
 
@@ -140,8 +221,9 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
     int32_t plot_max_offset;
     uint32_t dual_count;
     int32_t line_h, grid_i, grid_y;
-    int32_t prev_x, prev_y, swatch;
-    int retro;
+    int32_t prev_x, prev_y, time_w;
+    datasource_handler_t *handler;
+    int retro, has_labels, labeled;
 
     if (!plot || !renderer || !font) return;
 
@@ -359,57 +441,6 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
     format_value(plot, plot_stats_cache[plot_index].avg_value, avg_formatted, sizeof(avg_formatted));
     format_value(plot, plot_stats_cache[plot_index].last_value, last_formatted, sizeof(last_formatted));
 
-    swatch = 0;
-    if (!retro && plot->is_dual && plot->data_buffer_secondary) {
-        swatch = line_h - 6;
-        if (swatch < 3) swatch = 3;
-    }
-
-    /* Dual plots read as a legend: a swatch in front of each series value, so
-     * which color is which is obvious without a key elsewhere. */
-    if (swatch) {
-        format_value(plot, plot_stats_cache[plot_index].last_value_secondary,
-                     formatted, sizeof(formatted));
-        font_get_text_size(font, last_formatted, &text_width, &text_height);
-        font_get_text_size(font, formatted, &scale_text_width, &scale_text_height);
-        text_x = x + width - (2 * swatch + text_width + scale_text_width + 16);
-    }
-
-    if (swatch && text_x > x) {
-        border_rect.y = footer_y + 3;
-        border_rect.w = swatch;
-        border_rect.h = swatch;
-
-        border_rect.x = text_x;
-        renderer_set_color(renderer, line_color);
-        renderer_fill_rect(renderer, border_rect);
-        font_draw_text(renderer, font, line_color, text_x + swatch + 4, footer_y,
-                       last_formatted);
-
-        border_rect.x = text_x + swatch + 4 + text_width + 8;
-        renderer_set_color(renderer, plot->config->line_color_secondary);
-        renderer_fill_rect(renderer, border_rect);
-        font_draw_text(renderer, font, plot->config->line_color_secondary,
-                       border_rect.x + swatch + 4, footer_y, formatted);
-    } else {
-        /* Too narrow to split, fall back to the combined reading. */
-        swatch = 0;
-        if (plot->is_dual && plot->data_source && plot->data_source->datasource &&
-            plot->data_source->datasource->handler->format_dual_stats) {
-            plot->data_source->datasource->handler->format_dual_stats(
-                plot_stats_cache[plot_index].last_value,
-                plot_stats_cache[plot_index].last_value_secondary,
-                stats_text, sizeof(stats_text));
-        } else {
-            snprintf(stats_text, sizeof(stats_text), "%s", last_formatted);
-        }
-
-        font_get_text_size(font, stats_text, &text_width, &text_height);
-        text_x = x + width - text_width;
-        font_draw_text(renderer, font, retro ? global_config->text_color : line_color,
-                       text_x, footer_y, stats_text);
-    }
-
     buffer_size = plot->data_buffer->size;
     total_time_ms = buffer_size * (uint32_t)refresh_interval;
     if (total_time_ms < 60000) {
@@ -430,15 +461,55 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
     font_draw_text(renderer, font,
                    retro ? global_config->text_color : global_config->text_dim_color,
                    x, footer_y, time_span_text);
+    font_get_text_size(font, time_span_text, &time_w, &text_height);
 
-    /* The average has been computed all along and never shown; it fits in the
-     * gap between the time span and the current reading. */
+    handler = (plot->data_source && plot->data_source->datasource) ?
+              plot->data_source->datasource->handler : NULL;
+    has_labels = plot->is_dual && plot->data_buffer_secondary && handler &&
+                 handler->label && handler->label_secondary;
+
+    labeled = 0;
+    if (has_labels) {
+        format_value(plot, plot_stats_cache[plot_index].last_value_secondary,
+                     formatted, sizeof(formatted));
+        text_x = x + width - dual_reading(NULL, font, 0, 0, line_h, handler,
+                                          last_formatted, formatted,
+                                          line_color, line_color);
+        labeled = (text_x >= x + time_w + 8);
+    }
+
+    if (labeled) {
+        /* In the trace colors in retro too: white labels would not say which
+         * trace is which. */
+        dual_reading(renderer, font, text_x, footer_y, line_h, handler,
+                     last_formatted, formatted,
+                     line_color, plot->config->line_color_secondary);
+    } else {
+        /* No labels, or too narrow for them: the combined reading. */
+        if (plot->is_dual && handler && handler->format_dual_stats) {
+            handler->format_dual_stats(plot_stats_cache[plot_index].last_value,
+                                       plot_stats_cache[plot_index].last_value_secondary,
+                                       stats_text, sizeof(stats_text));
+        } else {
+            snprintf(stats_text, sizeof(stats_text), "%s", last_formatted);
+        }
+
+        font_get_text_size(font, stats_text, &text_width, &text_height);
+        text_x = x + width - text_width;
+        font_draw_text(renderer, font, retro ? global_config->text_color : line_color,
+                       text_x, footer_y, stats_text);
+    }
+
+    /* The average goes in the gap between the time span and the current
+     * reading: centred when there is room, else pushed left clear of the
+     * reading rather than dropped. */
     if (!retro) {
         snprintf(temp, sizeof(temp), "avg %s", avg_formatted);
         font_get_text_size(font, temp, &scale_text_width, &scale_text_height);
-        font_get_text_size(font, time_span_text, &text_width, &text_height);
         scale_x = x + (width - scale_text_width) / 2;
-        if (scale_x > x + text_width + 8 && scale_x + scale_text_width < text_x - 8)
+        if (scale_x + scale_text_width > text_x - 8)
+            scale_x = text_x - 8 - scale_text_width;
+        if (scale_x >= x + time_w + 8)
             font_draw_text(renderer, font, global_config->text_dim_color, scale_x,
                            footer_y, temp);
     }
@@ -459,6 +530,8 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
         uint32_t time_seconds, time_minutes, time_hours;
         char time_text[64];
         char value_text[64];
+        char value2_text[64];
+        int32_t reading_w;
 
         guide_x = hover_x;
         guide_top = plot_top;
@@ -503,20 +576,36 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
                 snprintf(time_text, sizeof(time_text), "%uh%um ago", time_hours, time_minutes % 60);
             }
 
-            if (plot->is_dual && plot->data_source && plot->data_source->datasource && plot->data_source->datasource->handler->format_dual_stats) {
-                plot->data_source->datasource->handler->format_dual_stats(hover_value, hover_value_secondary, value_text, sizeof(value_text));
-            } else if (plot->data_source && plot->data_source->datasource && plot->data_source->datasource->handler->format_value) {
-                plot->data_source->datasource->handler->format_value(hover_value, value_text, sizeof(value_text));
-            } else {
-                if (strlen(unit) > 0) {
-                    snprintf(value_text, sizeof(value_text), "%.1f%s", hover_value, unit);
-                } else {
-                    snprintf(value_text, sizeof(value_text), "%.1f", hover_value);
-                }
+            /* Labelled like the footer when it fits in the panel. */
+            reading_w = 0;
+            if (has_labels) {
+                format_value(plot, hover_value, value_text, sizeof(value_text));
+                format_value(plot, hover_value_secondary, value2_text, sizeof(value2_text));
+                snprintf(hover_text, sizeof(hover_text), " - %s", time_text);
+                font_get_text_size(font, hover_text, &hover_text_width, &hover_text_height);
+                reading_w = dual_reading(NULL, font, 0, 0, line_h, handler,
+                                         value_text, value2_text, line_color, line_color);
+                hover_text_width += reading_w;
+                if (hover_text_width > width - 4)
+                    reading_w = 0;
             }
 
-            snprintf(hover_text, sizeof(hover_text), "%s - %s", value_text, time_text);
-            font_get_text_size(font, hover_text, &hover_text_width, &hover_text_height);
+            if (!reading_w) {
+                if (plot->is_dual && handler && handler->format_dual_stats) {
+                    handler->format_dual_stats(hover_value, hover_value_secondary, value_text, sizeof(value_text));
+                } else if (handler && handler->format_value) {
+                    handler->format_value(hover_value, value_text, sizeof(value_text));
+                } else {
+                    if (strlen(unit) > 0) {
+                        snprintf(value_text, sizeof(value_text), "%.1f%s", hover_value, unit);
+                    } else {
+                        snprintf(value_text, sizeof(value_text), "%.1f", hover_value);
+                    }
+                }
+
+                snprintf(hover_text, sizeof(hover_text), "%s - %s", value_text, time_text);
+                font_get_text_size(font, hover_text, &hover_text_width, &hover_text_height);
+            }
 
             hover_text_x = guide_x + 6;
             if (hover_text_x + hover_text_width + 4 > x + width) {
@@ -547,9 +636,15 @@ void plot_draw(plot_t *plot, renderer_t *renderer, font_t *font,
                 renderer_draw_rect(renderer, border_rect);
             }
 
+            if (reading_w)
+                dual_reading(renderer, font, hover_text_x, hover_text_y, line_h, handler,
+                             value_text, value2_text,
+                             retro ? border_color : line_color,
+                             retro ? border_color : plot->config->line_color_secondary);
+
             font_draw_text(renderer, font,
                            retro ? border_color : global_config->text_color,
-                           hover_text_x, hover_text_y, hover_text);
+                           hover_text_x + reading_w, hover_text_y, hover_text);
         }
     }
 }

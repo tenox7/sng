@@ -231,5 +231,7 @@ datasource_handler_t ping_handler = {
     "ping",
     "ms",
     1,
-    0.0
+    0.0,
+    "rtt",
+    "jit"
 };

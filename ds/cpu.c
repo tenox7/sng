@@ -133,5 +133,7 @@ datasource_handler_t cpu_handler = {
     "cpu",
     "%",
     1,
-    100.0
+    100.0,
+    "tot",
+    "sys"
 };

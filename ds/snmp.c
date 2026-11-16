@@ -264,5 +264,7 @@ datasource_handler_t snmp_handler = {
     "snmp",
     "B/s",
     1,
-    0.0
+    0.0,
+    "dn",
+    "up"
 };

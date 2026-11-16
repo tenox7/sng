@@ -128,5 +128,7 @@ datasource_handler_t memory_handler = {
     "memory",
     "%",
     1,
-    100.0
+    100.0,
+    "mem",
+    "swap"
 };

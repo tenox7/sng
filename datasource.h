@@ -28,6 +28,11 @@ typedef struct {
     const char *unit;
     int is_dual;
     double max_scale;
+    /* Short names for the two series of a dual source, printed in front of
+     * their readings so it is clear which trace is which.  "dn" and "up" are
+     * drawn as arrows where the renderer can.  NULL: the combined reading. */
+    const char *label;
+    const char *label_secondary;
 } datasource_handler_t;
 
 typedef struct {

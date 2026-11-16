@@ -515,20 +515,6 @@ static void render_chart(fb_t *fb, uint32_t idx, int32_t x, int32_t y, int32_t w
         handler->get_stats(source->datasource->context, &stats);
     }
 
-    if (handler && handler->format_value) {
-        if (source->is_dual && handler->format_dual_stats) {
-            handler->format_dual_stats(stats.last, stats.last_secondary,
-                                       stats_text, sizeof(stats_text));
-        } else {
-            handler->format_value(stats.last, stats_text, sizeof(stats_text));
-        }
-    } else if (strlen(unit) > 0) {
-        snprintf(stats_text, sizeof(stats_text), "%.1f%s", stats.last, unit);
-    } else {
-        snprintf(stats_text, sizeof(stats_text), "%.1f", stats.last);
-    }
-    fb_text(fb, x + width - fb_text_width(stats_text), y + height - 15, stats_text, text_ci);
-
     total_time_ms = source->data_buffer->size * (uint32_t)refresh_interval;
     if (total_time_ms < 60000) {
         snprintf(time_span_text, sizeof(time_span_text), "%us", total_time_ms / 1000);
@@ -545,6 +531,38 @@ static void render_chart(fb_t *fb, uint32_t idx, int32_t x, int32_t y, int32_t w
         snprintf(time_span_text, sizeof(time_span_text), "%ud", days);
     }
     fb_text(fb, x, y + height - 15, time_span_text, text_ci);
+
+    /* Labelled like the local display, each reading in its trace color so it
+     * says which trace is which; "dn" and "up" stay words, the 6x9 font has
+     * no arrows. */
+    if (handler && handler->format_value && source->is_dual &&
+        handler->label && handler->label_secondary) {
+        handler->format_value(stats.last, formatted, sizeof(formatted));
+        snprintf(stats_text, sizeof(stats_text), "%s %s", handler->label, formatted);
+        handler->format_value(stats.last_secondary, formatted, sizeof(formatted));
+        snprintf(temp, sizeof(temp), "%s %s", handler->label_secondary, formatted);
+        if (fb_text_width(stats_text) + 2 * FONT_W + fb_text_width(temp) <=
+            width - fb_text_width(time_span_text) - 8) {
+            fb_text(fb, x + width - fb_text_width(temp), y + height - 15, temp, line2_ci);
+            fb_text(fb, x + width - fb_text_width(temp) - 2 * FONT_W - fb_text_width(stats_text),
+                    y + height - 15, stats_text, line_ci);
+            return;
+        }
+    }
+
+    if (handler && handler->format_value) {
+        if (source->is_dual && handler->format_dual_stats) {
+            handler->format_dual_stats(stats.last, stats.last_secondary,
+                                       stats_text, sizeof(stats_text));
+        } else {
+            handler->format_value(stats.last, stats_text, sizeof(stats_text));
+        }
+    } else if (strlen(unit) > 0) {
+        snprintf(stats_text, sizeof(stats_text), "%.1f%s", stats.last, unit);
+    } else {
+        snprintf(stats_text, sizeof(stats_text), "%.1f", stats.last);
+    }
+    fb_text(fb, x + width - fb_text_width(stats_text), y + height - 15, stats_text, text_ci);
 }
 
 static uint8_t *render_gif(uint32_t *out_len) {

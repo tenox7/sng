@@ -266,5 +266,7 @@ datasource_handler_t if_thr_handler = {
     "if_thr",
     "B/s",
     1,
-    0.0
+    0.0,
+    "dn",
+    "up"
 };
